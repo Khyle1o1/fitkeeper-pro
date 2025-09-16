@@ -1,0 +1,126 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Download, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { mockAttendanceRecords } from '@/data/mockData';
+import { useToast } from '@/hooks/use-toast';
+
+const AttendanceReport = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [filters, setFilters] = useState({
+    period: 'daily',
+    startDate: '2024-09-16',
+    endDate: '2024-09-16',
+  });
+
+  const handleExportPDF = () => {
+    toast({
+      title: "PDF Export",
+      description: "Attendance report has been exported to PDF format.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    toast({
+      title: "CSV Export",
+      description: "Attendance report has been exported to CSV format.",
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Reports
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">Attendance Report</h1>
+          <p className="text-muted-foreground">Track member attendance patterns and check-in data</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card className="border-0 shadow-md">
+        <CardHeader>
+          <CardTitle>Report Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Report Period</Label>
+              <Select value={filters.period} onValueChange={(value) => setFilters(prev => ({ ...prev, period: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex gap-4 mt-4">
+            <Button onClick={handleExportPDF} variant="outline" className="flex-1">
+              <FileText className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
+            <Button onClick={handleExportCSV} variant="outline" className="flex-1">
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Attendance Data */}
+      <Card className="border-0 shadow-md">
+        <CardHeader>
+          <CardTitle>Attendance Records</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {mockAttendanceRecords.map((record) => (
+              <div key={record.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                <div>
+                  <p className="font-medium">{record.memberName}</p>
+                  <p className="text-sm text-muted-foreground">ID: {record.memberId}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">{record.checkInTime}</p>
+                  <p className="text-sm text-muted-foreground">{record.date}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default AttendanceReport;

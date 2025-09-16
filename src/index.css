@@ -2,104 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Gym Management System Design System - Professional fitness theme with semantic tokens */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Core Background & Surfaces */
+    --background: 248 250 252;
+    --foreground: 15 23 42;
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    
+    /* Primary Brand - Energetic Blue */
+    --primary: 59 130 246;
+    --primary-foreground: 255 255 255;
+    --primary-hover: 37 99 235;
+    
+    /* Secondary - Success Green */
+    --secondary: 34 197 94;
+    --secondary-foreground: 255 255 255;
+    --secondary-hover: 22 163 74;
+    
+    /* Accent - Warning Orange */
+    --accent: 251 146 60;
+    --accent-foreground: 255 255 255;
+    --accent-hover: 249 115 22;
+    
+    /* Status Colors */
+    --success: 34 197 94;
+    --success-foreground: 255 255 255;
+    --warning: 251 146 60;
+    --warning-foreground: 255 255 255;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    
+    /* Neutral Grays */
+    --muted: 241 245 249;
+    --muted-foreground: 100 116 139;
+    --border: 226 232 240;
+    --input: 226 232 240;
+    --ring: 59 130 246;
+    
+    /* Popover & Dialog */
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    
+    /* Sidebar */
+    --sidebar-background: 255 255 255;
+    --sidebar-foreground: 71 85 105;
+    --sidebar-primary: 59 130 246;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 241 245 249;
+    --sidebar-accent-foreground: 71 85 105;
+    --sidebar-border: 226 232 240;
+    --sidebar-ring: 59 130 246;
+    
+    /* Custom Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(220 91% 57%), hsl(220 83% 53%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 76% 36%));
+    --gradient-dashboard: linear-gradient(135deg, hsl(220 91% 57%) 0%, hsl(142 71% 45%) 100%);
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.3);
+    
+    /* Animation */
+    --transition-base: all 0.2s ease-in-out;
+    --transition-slow: all 0.3s ease-in-out;
+    
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 3 7 18;
+    --foreground: 248 250 252;
+    --card: 15 23 42;
+    --card-foreground: 248 250 252;
+    
+    --primary: 96 165 250;
+    --primary-foreground: 3 7 18;
+    --primary-hover: 59 130 246;
+    
+    --secondary: 74 222 128;
+    --secondary-foreground: 3 7 18;
+    --secondary-hover: 34 197 94;
+    
+    --accent: 251 191 36;
+    --accent-foreground: 3 7 18;
+    --accent-hover: 245 158 11;
+    
+    --success: 74 222 128;
+    --success-foreground: 3 7 18;
+    --warning: 251 191 36;
+    --warning-foreground: 3 7 18;
+    --destructive: 248 113 113;
+    --destructive-foreground: 3 7 18;
+    
+    --muted: 30 41 59;
+    --muted-foreground: 148 163 184;
+    --border: 30 41 59;
+    --input: 30 41 59;
+    --ring: 96 165 250;
+    
+    --popover: 15 23 42;
+    --popover-foreground: 248 250 252;
+    
+    --sidebar-background: 15 23 42;
+    --sidebar-foreground: 148 163 184;
+    --sidebar-primary: 96 165 250;
+    --sidebar-primary-foreground: 3 7 18;
+    --sidebar-accent: 30 41 59;
+    --sidebar-accent-foreground: 148 163 184;
+    --sidebar-border: 30 41 59;
+    --sidebar-ring: 96 165 250;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(220 91% 67%), hsl(220 83% 63%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 55%), hsl(142 76% 46%));
+    --gradient-dashboard: linear-gradient(135deg, hsl(220 91% 67%) 0%, hsl(142 71% 55%) 100%);
+    
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.4);
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border transition-[border-color,background-color,color,fill,stroke,opacity,box-shadow,transform];
+    transition-duration: 200ms;
+    transition-timing-function: ease-in-out;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom utility classes */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+  
+  .gradient-dashboard {
+    background: var(--gradient-dashboard);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
