@@ -6,60 +6,60 @@
 
 @layer base {
   :root {
-    /* Core Background & Surfaces */
-    --background: 248 250 252;
-    --foreground: 15 23 42;
-    --card: 255 255 255;
-    --card-foreground: 15 23 42;
+    /* Core Background & Surfaces (PowerLift: black, white, steel) */
+    --background: 0 0% 6%;        /* near black */
+    --foreground: 0 0% 98%;       /* near white */
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
     
-    /* Primary Brand - Energetic Blue */
-    --primary: 59 130 246;
-    --primary-foreground: 255 255 255;
-    --primary-hover: 37 99 235;
+    /* Primary Brand - Power red */
+    --primary: 0 72% 50%;         /* strong red */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 0 72% 42%;
     
-    /* Secondary - Success Green */
-    --secondary: 34 197 94;
-    --secondary-foreground: 255 255 255;
-    --secondary-hover: 22 163 74;
+    /* Secondary - Graphite */
+    --secondary: 0 0% 22%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-hover: 0 0% 18%;
     
-    /* Accent - Warning Orange */
-    --accent: 251 146 60;
-    --accent-foreground: 255 255 255;
-    --accent-hover: 249 115 22;
+    /* Accent - Silver */
+    --accent: 0 0% 70%;
+    --accent-foreground: 0 0% 10%;
+    --accent-hover: 0 0% 62%;
     
     /* Status Colors */
-    --success: 34 197 94;
-    --success-foreground: 255 255 255;
-    --warning: 251 146 60;
-    --warning-foreground: 255 255 255;
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
+    --success: 142 71% 45%;       /* green for success */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;        /* amber for warning */
+    --warning-foreground: 0 0% 10%;
+    --destructive: 0 72% 42%;     /* darker red */
+    --destructive-foreground: 0 0% 100%;
     
-    /* Neutral Grays */
-    --muted: 241 245 249;
-    --muted-foreground: 100 116 139;
-    --border: 226 232 240;
-    --input: 226 232 240;
-    --ring: 59 130 246;
+    /* Neutrals */
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 80%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 72% 50%;
     
     /* Popover & Dialog */
-    --popover: 255 255 255;
-    --popover-foreground: 15 23 42;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
     
     /* Sidebar */
-    --sidebar-background: 255 255 255;
-    --sidebar-foreground: 71 85 105;
-    --sidebar-primary: 59 130 246;
-    --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 241 245 249;
-    --sidebar-accent-foreground: 71 85 105;
-    --sidebar-border: 226 232 240;
-    --sidebar-ring: 59 130 246;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 80%;
+    --sidebar-primary: 0 72% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 14%;
+    --sidebar-accent-foreground: 0 0% 80%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 0 72% 50%;
     
     /* Custom Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(220 91% 57%), hsl(220 83% 53%));
-    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 76% 36%));
-    --gradient-dashboard: linear-gradient(135deg, hsl(220 91% 57%) 0%, hsl(142 71% 45%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(0 85% 40%), hsl(0 80% 55%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 65% 38%));
+    --gradient-dashboard: linear-gradient(135deg, hsl(0 85% 40%) 0%, hsl(0 0% 60%) 100%);
     
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -75,51 +75,52 @@
   }
 
   .dark {
-    --background: 3 7 18;
-    --foreground: 248 250 252;
-    --card: 15 23 42;
-    --card-foreground: 248 250 252;
+    /* Dark mode stays close to brand, slightly lighter surfaces */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
     
-    --primary: 96 165 250;
-    --primary-foreground: 3 7 18;
-    --primary-hover: 59 130 246;
+    --primary: 0 80% 56%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 0 80% 48%;
     
-    --secondary: 74 222 128;
-    --secondary-foreground: 3 7 18;
-    --secondary-hover: 34 197 94;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-hover: 0 0% 14%;
     
-    --accent: 251 191 36;
-    --accent-foreground: 3 7 18;
-    --accent-hover: 245 158 11;
+    --accent: 0 0% 72%;
+    --accent-foreground: 0 0% 10%;
+    --accent-hover: 0 0% 64%;
     
-    --success: 74 222 128;
-    --success-foreground: 3 7 18;
-    --warning: 251 191 36;
-    --warning-foreground: 3 7 18;
-    --destructive: 248 113 113;
-    --destructive-foreground: 3 7 18;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+    --destructive: 0 80% 48%;
+    --destructive-foreground: 0 0% 100%;
     
-    --muted: 30 41 59;
-    --muted-foreground: 148 163 184;
-    --border: 30 41 59;
-    --input: 30 41 59;
-    --ring: 96 165 250;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 80%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 80% 56%;
     
-    --popover: 15 23 42;
-    --popover-foreground: 248 250 252;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
     
-    --sidebar-background: 15 23 42;
-    --sidebar-foreground: 148 163 184;
-    --sidebar-primary: 96 165 250;
-    --sidebar-primary-foreground: 3 7 18;
-    --sidebar-accent: 30 41 59;
-    --sidebar-accent-foreground: 148 163 184;
-    --sidebar-border: 30 41 59;
-    --sidebar-ring: 96 165 250;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 80%;
+    --sidebar-primary: 0 80% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 80%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 0 80% 56%;
     
-    --gradient-primary: linear-gradient(135deg, hsl(220 91% 67%), hsl(220 83% 63%));
-    --gradient-success: linear-gradient(135deg, hsl(142 71% 55%), hsl(142 76% 46%));
-    --gradient-dashboard: linear-gradient(135deg, hsl(220 91% 67%) 0%, hsl(142 71% 55%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(0 85% 45%), hsl(0 80% 58%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 65% 38%));
+    --gradient-dashboard: linear-gradient(135deg, hsl(0 85% 45%) 0%, hsl(0 0% 60%) 100%);
     
     --shadow-glow: 0 0 20px hsl(var(--primary) / 0.4);
   }

@@ -50,11 +50,11 @@ const DashboardLayout = () => {
         />
       )}
 
-      <div className="flex">
+      <div className="flex min-h-screen">
         {/* Sidebar */}
         <div className={cn(
           "lg:w-64 lg:flex-shrink-0 lg:block",
-          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border lg:static lg:z-auto",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border lg:static lg:z-auto lg:h-screen",
           isSidebarOpen ? "block" : "hidden lg:block"
         )}>
           <div className="h-full flex flex-col">
@@ -101,7 +101,7 @@ const DashboardLayout = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 lg:ml-0">
+        <div className="flex-1 lg:ml-0 min-h-screen">
           <div className="p-6">
             <Outlet />
           </div>

@@ -60,6 +60,67 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## PostgreSQL (Supabase) setup
+
+This project uses Supabase (hosted PostgreSQL) for dynamic data.
+
+1) Create a project at https://supabase.com
+2) In the SQL editor, create a `members` table:
+
+```
+create table if not exists public.members (
+  id text primary key,
+  full_name text not null,
+  email text not null,
+  phone text not null,
+  membership_start_date date not null,
+  membership_expiry_date date not null,
+  status text not null default 'active',
+  is_active boolean not null default true,
+  inserted_at timestamp with time zone default now()
+);
+
+alter table public.members enable row level security;
+create policy "Allow read" on public.members for select using (true);
+create policy "Allow insert" on public.members for insert with check (true);
+create policy "Allow update" on public.members for update using (true);
+```
+
+3) Add environment variables. Copy `.env.example` to `.env` and fill values from Project Settings → API:
+
+```
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+4) Start the app:
+
+```
+npm install
+npm run dev
+```
+
+Pages now read/write members via Supabase:
+- Members list: fetches from `public.members`, archives by `is_active=false`.
+- Add Member: inserts a new record.
+
+### Attendance table
+
+Run this SQL to add attendance tracking:
+
+```
+create table if not exists public.attendance (
+  id uuid primary key default gen_random_uuid(),
+  member_id text not null references public.members(id) on delete cascade,
+  member_name text not null,
+  checked_in_at timestamp with time zone not null default now()
+);
+
+alter table public.attendance enable row level security;
+create policy "Allow read" on public.attendance for select using (true);
+create policy "Allow insert" on public.attendance for insert with check (true);
+```
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/1116fc44-429b-485d-bd67-f7621b2cefdf) and click on Share -> Publish.

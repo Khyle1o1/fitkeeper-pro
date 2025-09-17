@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 import { generateMemberId, calculateExpiryDate } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 const AddMember = () => {
   const navigate = useNavigate();
@@ -21,14 +22,30 @@ const AddMember = () => {
   const memberId = generateMemberId();
   const expiryDate = calculateExpiryDate(formData.membershipStartDate);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const { error } = await supabase.from('members').insert({
+      id: memberId,
+      full_name: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      membership_start_date: formData.membershipStartDate,
+      membership_expiry_date: expiryDate,
+      status: 'active',
+      is_active: true,
+    });
+
+    if (error) {
+      toast({ title: 'Failed to add member', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     toast({
-      title: "Member Added Successfully",
+      title: 'Member Added Successfully',
       description: `${formData.fullName} has been added with ID: ${memberId}`,
     });
-    
+
     navigate('/members');
   };
 
@@ -40,7 +57,7 @@ const AddMember = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
@@ -58,7 +75,7 @@ const AddMember = () => {
       </div>
 
       {/* Form */}
-      <Card className="border-0 shadow-md max-w-2xl">
+      <Card className="border-0 shadow-md w-full">
         <CardHeader>
           <CardTitle>Member Information</CardTitle>
         </CardHeader>

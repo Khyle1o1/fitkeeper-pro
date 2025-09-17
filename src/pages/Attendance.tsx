@@ -1,46 +1,98 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { QrCode, UserCheck } from 'lucide-react';
-import { mockMembers, mockAttendanceRecords } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 const Attendance = () => {
   const [memberId, setMemberId] = useState('');
   const [checkedInMember, setCheckedInMember] = useState<any>(null);
+  const [todayAttendance, setTodayAttendance] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const todayAttendance = mockAttendanceRecords.filter(r => r.date === '2024-09-16');
+  const refreshTodayAttendance = async () => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
 
-  const handleCheckIn = () => {
-    const member = mockMembers.find(m => m.id === memberId);
-    
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('*')
+      .gte('checked_in_at', start.toISOString())
+      .lte('checked_in_at', end.toISOString())
+      .order('checked_in_at', { ascending: false });
+
+    if (error) {
+      toast({ title: 'Failed to load attendance', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setTodayAttendance(data ?? []);
+  };
+
+  useEffect(() => {
+    refreshTodayAttendance();
+  }, []);
+
+  const handleCheckIn = async () => {
+    const { data: members, error: memberErr } = await supabase
+      .from('members')
+      .select('*')
+      .eq('id', memberId)
+      .limit(1);
+
+    if (memberErr) {
+      toast({ title: 'Lookup failed', description: memberErr.message, variant: 'destructive' });
+      return;
+    }
+
+    const member = members?.[0];
     if (!member) {
       toast({
-        title: "Member Not Found",
-        description: "No member found with this ID. Please check and try again.",
-        variant: "destructive",
+        title: 'Member Not Found',
+        description: 'No member found with this ID. Please check and try again.',
+        variant: 'destructive',
       });
       return;
     }
 
-    const checkInTime = new Date().toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      hour12: true 
+    const now = new Date();
+    const checkInTime = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
     });
 
-    setCheckedInMember({ ...member, checkInTime });
-    
-    toast({
-      title: "Check-in Successful",
-      description: `${member.fullName} checked in at ${checkInTime}`,
+    const { error: insertErr } = await supabase.from('attendance').insert({
+      member_id: member.id,
+      member_name: member.full_name,
+      checked_in_at: now.toISOString(),
     });
-    
+
+    if (insertErr) {
+      toast({ title: 'Failed to check in', description: insertErr.message, variant: 'destructive' });
+      return;
+    }
+
+    setCheckedInMember({
+      id: member.id,
+      fullName: member.full_name,
+      status: member.status,
+      checkInTime,
+    });
+
+    toast({
+      title: 'Check-in Successful',
+      description: `${member.full_name} checked in at ${checkInTime}`,
+    });
+
     setMemberId('');
+    refreshTodayAttendance();
   };
 
   return (
@@ -104,11 +156,11 @@ const Attendance = () => {
               {todayAttendance.map((record) => (
                 <div key={record.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
-                    <p className="font-medium">{record.memberName}</p>
-                    <p className="text-sm text-muted-foreground">ID: {record.memberId}</p>
+                    <p className="font-medium">{record.member_name}</p>
+                    <p className="text-sm text-muted-foreground">ID: {record.member_id}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{record.checkInTime}</p>
+                    <p className="font-medium">{new Date(record.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
                     <Badge variant="outline" className="text-xs">Active</Badge>
                   </div>
                 </div>
