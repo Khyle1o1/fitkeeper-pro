@@ -13,6 +13,7 @@ export type PdfExportOptions = {
   rows: Array<Record<string, unknown>>;
   filename: string;
   footnote?: string;
+  includeSignatures?: boolean; // when true, render three signature lines at the end
 };
 
 export function exportTableToPdf(options: PdfExportOptions) {
@@ -54,11 +55,39 @@ export function exportTableToPdf(options: PdfExportOptions) {
     margin: { left: marginLeft, right: marginLeft },
   });
 
+  const finalY = (doc as any).lastAutoTable?.finalY ?? cursorY;
+
   if (options.footnote) {
-    const finalY = (doc as any).lastAutoTable?.finalY ?? cursorY;
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(options.footnote, marginLeft, finalY + 24);
+  }
+
+  // Optional signature section
+  if (options.includeSignatures) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const usableWidth = pageWidth - marginLeft * 2;
+    const colWidth = usableWidth / 3;
+    const baseY = finalY + 64; // space after table/footnote
+
+    // Draw three signature lines and labels
+    for (let i = 0; i < 3; i++) {
+      const x = marginLeft + i * colWidth;
+      const lineY = baseY;
+      doc.setDrawColor(180);
+      doc.line(x, lineY, x + colWidth - 16, lineY); // signature line
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      const label = i === 0 ? 'Prepared by' : i === 1 ? 'Checked by' : 'Approved by';
+      const label2 = 'Name & Signature';
+      const centerX = x + (colWidth - 16) / 2;
+      doc.text(label, centerX, lineY + 14, { align: 'center' as any });
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text(label2, centerX, lineY + 28, { align: 'center' as any });
+    }
+
+
   }
 
   doc.save(options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`);
@@ -152,11 +181,36 @@ export async function exportTableToPdfWithLogo(options: PdfExportWithLogoOptions
     margin: { left: marginLeft, right: marginLeft },
   });
 
+  const finalY = (doc as any).lastAutoTable?.finalY ?? cursorY;
+
   if (options.footnote) {
-    const finalY = (doc as any).lastAutoTable?.finalY ?? cursorY;
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(options.footnote, marginLeft, finalY + 24);
+  }
+
+  // Optional signature section
+  if (options.includeSignatures) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const usableWidth = pageWidth - marginLeft * 2;
+    const colWidth = usableWidth / 3;
+    const baseY = finalY + 64; // space after table/footnote
+
+    for (let i = 0; i < 3; i++) {
+      const x = marginLeft + i * colWidth;
+      const lineY = baseY;
+      doc.setDrawColor(180);
+      doc.line(x, lineY, x + colWidth - 16, lineY);
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      const label = i === 0 ? 'Prepared by' : i === 1 ? 'Checked by' : 'Approved by';
+      const label2 = 'Name & Signature';
+      const centerX = x + (colWidth - 16) / 2;
+      doc.text(label, centerX, lineY + 14, { align: 'center' as any });
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text(label2, centerX, lineY + 28, { align: 'center' as any });
+    }
   }
 
   doc.save(options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`);
