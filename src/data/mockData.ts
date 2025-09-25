@@ -20,6 +20,7 @@ export interface AttendanceRecord {
   memberId: string;
   memberName: string;
   checkInTime: string;
+  checkOutTime?: string;
   date: string;
 }
 

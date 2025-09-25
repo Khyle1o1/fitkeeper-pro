@@ -12,9 +12,10 @@ export class PowerLiftDatabase extends Dexie {
 
   constructor() {
     super("powerlift-fitness-db");
-    this.version(3).stores({
+    // v4: add checkOutTime to attendance schema
+    this.version(4).stores({
       members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths",
-      attendance: "id, memberId, memberName, date, checkInTime",
+      attendance: "id, memberId, memberName, date, checkInTime, checkOutTime",
       renewals: "id, memberId, renewalDate",
     });
   }
