@@ -8,11 +8,17 @@ import { Plus, Search, Edit, Archive } from 'lucide-react';
 import { Member } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { db, initLocalDb } from '@/lib/db';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { generateBarcodeDataUrl, generateQrCodeDataUrl } from '@/lib/utils';
 
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [qrPreview, setQrPreview] = useState<string | null>(null);
+  const [barcodePreview, setBarcodePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -50,6 +56,33 @@ const Members = () => {
         return <Badge variant="secondary">Unknown</Badge>;
     }
   };
+
+  const openMemberDialog = (member: Member) => {
+    setSelectedMember(member);
+    setIsDialogOpen(true);
+  };
+
+  const closeMemberDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedMember(null);
+    setQrPreview(null);
+    setBarcodePreview(null);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!selectedMember) return;
+      // Prefer stored data URLs; otherwise generate from member ID
+      const qr = selectedMember.qrCodeDataUrl || await generateQrCodeDataUrl(selectedMember.id);
+      const bar = selectedMember.barcodeDataUrl || await generateBarcodeDataUrl(selectedMember.id);
+      if (!cancelled) {
+        setQrPreview(qr);
+        setBarcodePreview(bar);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedMember]);
 
   return (
     <div className="space-y-6">
@@ -91,7 +124,11 @@ const Members = () => {
           <div className="space-y-4">
             {filteredMembers.length > 0 ? (
               filteredMembers.map((member) => (
-                <div key={member.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors">
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => openMemberDialog(member)}
+                >
                   <div className="flex-1">
                     <div className="flex items-center gap-4">
                       <div>
@@ -111,16 +148,11 @@ const Members = () => {
                   <div className="flex items-center gap-4">
                     {getStatusBadge(member.status)}
                     <div className="flex gap-2">
-                      <Link to={`/members/edit/${member.id}`}>
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
                       {member.isActive && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleArchiveMember(member.id)}
+                          onClick={(e) => { e.stopPropagation(); handleArchiveMember(member.id); }}
                           className="text-destructive hover:text-destructive"
                         >
                           <Archive className="h-4 w-4" />
@@ -138,6 +170,82 @@ const Members = () => {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => (open ? setIsDialogOpen(true) : closeMemberDialog())}>
+        <DialogContent>
+          {selectedMember && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{selectedMember.fullName}</DialogTitle>
+                <DialogDescription>Member information</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="space-y-3">
+                  <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                    {selectedMember.photoDataUrl ? (
+                      <img src={selectedMember.photoDataUrl} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No photo</span>
+                    )}
+                  </div>
+                  <Link to={`/members/edit/${selectedMember.id}`}>
+                    <Button className="w-full">Edit Member</Button>
+                  </Link>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Member ID</p>
+                      <p className="font-medium">{selectedMember.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <div className="mt-1">{getStatusBadge(selectedMember.status)}</div>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="font-medium break-all">{selectedMember.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <p className="font-medium">{selectedMember.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Membership Start</p>
+                      <p className="font-medium">{selectedMember.membershipStartDate}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Expiry Date</p>
+                      <p className="font-medium">{selectedMember.membershipExpiryDate}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <p className="text-sm text-muted-foreground">QR Code</p>
+                      {qrPreview ? (
+                        <img src={qrPreview} alt="QR Code" className="w-40 h-40" />
+                      ) : (
+                        <div className="w-40 h-40 bg-muted rounded" />
+                      )}
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <p className="text-sm text-muted-foreground">Barcode</p>
+                      {barcodePreview ? (
+                        <img src={barcodePreview} alt="Barcode" className="w-60 h-16 object-contain" />
+                      ) : (
+                        <div className="w-60 h-16 bg-muted rounded" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,28 +1,59 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
-import { mockMembers } from '@/data/mockData';
+import { type Member } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
+import { db, initLocalDb } from '@/lib/db';
 
 const EditMember = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const member = mockMembers.find(m => m.id === id);
-  
+  const [loading, setLoading] = useState(true);
+  const [member, setMember] = useState<Member | null>(null);
   const [formData, setFormData] = useState({
-    fullName: member?.fullName || '',
-    email: member?.email || '',
-    phone: member?.phone || '',
-    membershipExpiryDate: member?.membershipExpiryDate || '',
+    fullName: '',
+    email: '',
+    phone: '',
+    membershipExpiryDate: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!id) return;
+      await initLocalDb();
+      const found = await db.members.get(id);
+      if (!cancelled) {
+        setMember(found || null);
+        if (found) {
+          setFormData({
+            fullName: found.fullName,
+            email: found.email,
+            phone: found.phone,
+            membershipExpiryDate: found.membershipExpiryDate,
+          });
+        }
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!id) return;
+    await initLocalDb();
+    await db.members.update(id, {
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      membershipExpiryDate: formData.membershipExpiryDate,
+    } as any);
     toast({
       title: "Member Updated",
       description: `${formData.fullName}'s information has been updated successfully.`,
@@ -39,6 +70,10 @@ const EditMember = () => {
       description: "Membership has been extended by 1 month.",
     });
   };
+
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
 
   if (!member) {
     return <div className="p-6">Member not found</div>;
