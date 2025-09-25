@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { isNative, arrayBufferToBase64, saveDataUrlNative } from './native';
 import autoTable, { RowInput } from 'jspdf-autotable';
 
 export type PdfTableColumn = {
@@ -16,7 +17,7 @@ export type PdfExportOptions = {
   includeSignatures?: boolean; // when true, render three signature lines at the end
 };
 
-export function exportTableToPdf(options: PdfExportOptions) {
+export async function exportTableToPdf(options: PdfExportOptions) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
 
   const marginLeft = 40;
@@ -90,7 +91,15 @@ export function exportTableToPdf(options: PdfExportOptions) {
 
   }
 
-  doc.save(options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`);
+  const finalName = options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`;
+  if (isNative()) {
+    const buffer = doc.output('arraybuffer');
+    const base64 = arrayBufferToBase64(buffer as ArrayBuffer);
+    const dataUrl = `data:application/pdf;base64,${base64}`;
+    await saveDataUrlNative(finalName, dataUrl);
+  } else {
+    doc.save(finalName);
+  }
 }
 
 async function loadImageAsDataUrl(url: string): Promise<string | null> {
@@ -213,7 +222,15 @@ export async function exportTableToPdfWithLogo(options: PdfExportWithLogoOptions
     }
   }
 
-  doc.save(options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`);
+  const finalName = options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`;
+  if (isNative()) {
+    const buffer = doc.output('arraybuffer');
+    const base64 = arrayBufferToBase64(buffer as ArrayBuffer);
+    const dataUrl = `data:application/pdf;base64,${base64}`;
+    await saveDataUrlNative(finalName, dataUrl);
+  } else {
+    doc.save(finalName);
+  }
 }
 
 

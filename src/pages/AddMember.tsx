@@ -8,9 +8,10 @@ import { ArrowLeft } from 'lucide-react';
 import { generateMemberId, calculateExpiryDate } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { db, initLocalDb } from '@/lib/db';
-import { generateBarcodeDataUrl, generateQrCodeDataUrl } from '@/lib/utils';
+import { generateQrCodeDataUrl } from '@/lib/utils';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import jsPDF from 'jspdf';
+import { isNative, saveDataUrlNative } from '@/lib/native';
 
 const AddMember = () => {
   const navigate = useNavigate();
@@ -30,17 +31,14 @@ const AddMember = () => {
   ), [formData.membershipStartDate, formData.membershipDurationMonths]);
 
   const [qrCode, setQrCode] = useState<string | null>(null);
-  const [barcode, setBarcode] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const qr = await generateQrCodeDataUrl(memberId);
-      const bar = await generateBarcodeDataUrl(memberId);
       if (!cancelled) {
         setQrCode(qr);
-        setBarcode(bar);
       }
     })();
     return () => {
@@ -62,7 +60,6 @@ const AddMember = () => {
       membershipDurationMonths: formData.membershipDurationMonths,
       photoDataUrl: formData.photoDataUrl,
       qrCodeDataUrl: qrCode,
-      barcodeDataUrl: barcode,
       status: 'active',
       isActive: true,
     } as any);
@@ -91,7 +88,11 @@ const AddMember = () => {
     reader.readAsDataURL(file);
   };
 
-  const downloadDataUrl = (dataUrl: string, filename: string) => {
+  const downloadDataUrl = async (dataUrl: string, filename: string) => {
+    if (isNative()) {
+      await saveDataUrlNative(filename, dataUrl);
+      return;
+    }
     const a = document.createElement('a');
     a.href = dataUrl;
     a.download = filename;
@@ -104,7 +105,7 @@ const AddMember = () => {
     let y = margin;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
-    doc.text('Member QR & Barcode', margin, y);
+    doc.text('Member QR Code', margin, y);
     y += 24;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
@@ -120,10 +121,7 @@ const AddMember = () => {
     if (qrCode) {
       try { doc.addImage(qrCode, 'PNG', codesX, y, 144, 144); } catch {}
     }
-    if (barcode) {
-      try { doc.addImage(barcode, 'PNG', codesX, y + 160, 240, 60); } catch {}
-    }
-    doc.save(`${memberId}-codes.pdf`);
+    doc.save(`${memberId}-qr.pdf`);
   };
 
   // Render a membership ID card to a canvas and return it
@@ -222,35 +220,25 @@ const AddMember = () => {
       qr.onload = () => { try { ctx.drawImage(qr, qrX, qrY, size, size); } catch {} };
     }
 
-    // Barcode beneath QR
-    if (barcode) {
-      const bc = new Image();
-      bc.src = barcode;
-      const bcW = 520;
-      const bcH = 120;
-      const bcX = width / 2 - bcW / 2;
-      const bcY = height - 220;
-      try { ctx.drawImage(bc, bcX, bcY, bcW, bcH); } catch {}
-      bc.onload = () => { try { ctx.drawImage(bc, bcX, bcY, bcW, bcH); } catch {} };
-    }
+    // (Barcode removed)
 
     // Footer note
     ctx.fillStyle = textMuted;
     ctx.font = 'italic 18px Helvetica';
     ctx.textAlign = 'center';
-    ctx.fillText('Scan the QR or barcode to verify membership.', width / 2, height - 60);
+    ctx.fillText('Scan the QR to verify membership.', width / 2, height - 60);
     ctx.textAlign = 'start';
 
     return card;
   };
 
-  const downloadIdCardPng = () => {
+  const downloadIdCardPng = async () => {
     const canvas = renderIdCardCanvas();
     const dataUrl = canvas.toDataURL('image/png');
-    downloadDataUrl(dataUrl, `${memberId}-id-card.png`);
+    await downloadDataUrl(dataUrl, `${memberId}-id-card.png`);
   };
 
-  const downloadIdCardPdf = () => {
+  const downloadIdCardPdf = async () => {
     const canvas = renderIdCardCanvas();
     const img = canvas.toDataURL('image/png');
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -261,7 +249,14 @@ const AddMember = () => {
     const x = 40;
     const y = Math.max(40, (pageHeight - targetHeight) / 2);
     doc.addImage(img, 'PNG', x, y, targetWidth, targetHeight);
-    doc.save(`${memberId}-id-card.pdf`);
+    if (isNative()) {
+      const pdfArrayBuffer = doc.output('arraybuffer');
+      const base64 = (await import('@/lib/native')).then(m => m.arrayBufferToBase64(pdfArrayBuffer));
+      const dataUrl = `data:application/pdf;base64,${await base64}`;
+      await downloadDataUrl(dataUrl, `${memberId}-id-card.pdf`);
+    } else {
+      doc.save(`${memberId}-id-card.pdf`);
+    }
   };
 
   return (
@@ -405,12 +400,6 @@ const AddMember = () => {
                       <p className="font-semibold">QR Code</p>
                       <img src={qrCode} alt="QR" className="h-24 w-24" />
                     </div>
-                    {barcode && (
-                      <div>
-                        <p className="font-semibold">Barcode</p>
-                        <img src={barcode} alt="Barcode" className="h-10" />
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -454,7 +443,6 @@ const AddMember = () => {
               </div>
               <div className="flex items-center gap-6">
                 {qrCode && <img src={qrCode} className="h-28 w-28" alt="QR" />}
-                {barcode && <img src={barcode} className="h-10" alt="Barcode" />}
               </div>
             </div>
           </div>
