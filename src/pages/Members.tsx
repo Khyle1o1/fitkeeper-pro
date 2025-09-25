@@ -21,6 +21,13 @@ const Members = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
   const [barcodePreview, setBarcodePreview] = useState<string | null>(null);
+  const [tabsValue, setTabsValue] = useState<'active' | 'expired' | 'archived'>('active');
+  const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
+  const [renewMember, setRenewMember] = useState<Member | null>(null);
+  const [renewMonths, setRenewMonths] = useState<number>(1);
+  const [renewStep, setRenewStep] = useState<'select' | 'confirm'>('select');
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [archiveMember, setArchiveMember] = useState<Member | null>(null);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -119,6 +126,13 @@ const Members = () => {
     }
   };
 
+  const getRemainingDays = (expiryDate: string) => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const msPerDay = 1000 * 60 * 60 * 24;
+    return Math.max(0, Math.ceil((expiry.getTime() - today.getTime()) / msPerDay));
+  };
+
   const openMemberDialog = (member: Member) => {
     setSelectedMember(member);
     setIsDialogOpen(true);
@@ -178,7 +192,7 @@ const Members = () => {
       </Card>
 
       {/* Members List with Tabs */}
-      <Tabs defaultValue="active">
+      <Tabs value={tabsValue} onValueChange={(v) => setTabsValue(v as any)}>
         <TabsList>
           <TabsTrigger value="active">Active</TabsTrigger>
           <TabsTrigger value="expired">Expired</TabsTrigger>
@@ -224,7 +238,11 @@ const Members = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={(e) => { e.stopPropagation(); handleArchiveMember(member.id); }}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setArchiveMember(member);
+                                setIsArchiveDialogOpen(true);
+                              }}
                               className="text-destructive hover:text-destructive"
                             >
                               <Archive className="h-4 w-4" />
@@ -282,7 +300,7 @@ const Members = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); handleRenew(member.id); }}
+                            onClick={(e) => { e.stopPropagation(); setRenewMember(member); setRenewMonths(1); setRenewStep('select'); setIsRenewDialogOpen(true); }}
                             className="text-green-700 border-green-200 hover:bg-green-50"
                           >
                             Renew
@@ -339,7 +357,7 @@ const Members = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); handleRenew(member.id); }}
+                            onClick={(e) => { e.stopPropagation(); setRenewMember(member); setRenewMonths(1); setRenewStep('select'); setIsRenewDialogOpen(true); }}
                             className="text-green-700 border-green-200 hover:bg-green-50"
                           >
                             Renew
@@ -430,6 +448,157 @@ const Members = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Confirmation Modal */}
+      <Dialog
+        open={isArchiveDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsArchiveDialogOpen(false);
+            setArchiveMember(null);
+          } else {
+            setIsArchiveDialogOpen(true);
+          }
+        }}
+      >
+        <DialogContent>
+          {archiveMember && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">Archive Member</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to archive {archiveMember.fullName}? They still have an active membership with {getRemainingDays(archiveMember.membershipExpiryDate)} remaining days.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    const m = archiveMember;
+                    const remaining = getRemainingDays(m.membershipExpiryDate);
+                    await db.members.update(m.id, { isActive: false, status: 'archived' } as any);
+                    setMembers(prev => prev.map(x => x.id === m.id ? { ...x, isActive: false, status: 'archived' } : x));
+                    setTabsValue('archived');
+                    setIsArchiveDialogOpen(false);
+                    setArchiveMember(null);
+                    toast({ title: 'Member Archived', description: `Member ${m.fullName} has been archived despite having ${remaining} days remaining.` });
+                  }}
+                >
+                  Confirm
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Renew Modal */}
+      <Dialog
+        open={isRenewDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsRenewDialogOpen(false);
+            setRenewMember(null);
+            setRenewMonths(1);
+            setRenewStep('select');
+          } else {
+            setIsRenewDialogOpen(true);
+          }
+        }}
+      >
+        <DialogContent>
+          {renewMember && (
+            <div className="space-y-4">
+              {renewStep === 'select' && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl">Renew Membership</DialogTitle>
+                    <DialogDescription>
+                      How many months do you want to renew this membership?
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Months (1–12)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={renewMonths}
+                      onChange={(e) => setRenewMonths(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button variant="outline" onClick={() => { setIsRenewDialogOpen(false); }}>
+                      Cancel
+                    </Button>
+                    <Button className="bg-gradient-success hover:opacity-90" onClick={() => setRenewStep('confirm')}>
+                      Continue
+                    </Button>
+                  </div>
+                </>
+              )}
+              {renewStep === 'confirm' && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl">Confirm Renewal</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to renew {renewMember.fullName} for {renewMonths} {renewMonths === 1 ? 'month' : 'months'}?
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button variant="outline" onClick={() => setRenewStep('select')}>
+                      Back
+                    </Button>
+                    <Button
+                      className="bg-gradient-success hover:opacity-90"
+                      onClick={async () => {
+                        const member = renewMember;
+                        if (!member) return;
+                        const months = renewMonths;
+                        const nowIso = new Date().toISOString().split('T')[0];
+                        const currentExpiry = new Date(member.membershipExpiryDate);
+                        const baseDate = (member.status === 'expired' || member.status === 'archived') ? new Date() : currentExpiry;
+                        const newExpiry = new Date(baseDate);
+                        newExpiry.setMonth(newExpiry.getMonth() + months);
+                        const iso = newExpiry.toISOString().split('T')[0];
+
+                        await db.members.update(member.id, {
+                          membershipStartDate: nowIso,
+                          membershipExpiryDate: iso,
+                          status: 'active',
+                          isActive: true,
+                        } as any);
+
+                        setMembers(prev => prev.map(m => m.id === member.id ? {
+                          ...m,
+                          membershipStartDate: nowIso,
+                          membershipExpiryDate: iso,
+                          status: 'active',
+                          isActive: true,
+                        } : m));
+
+                        setTabsValue('active');
+                        setIsRenewDialogOpen(false);
+                        setRenewMember(null);
+                        setRenewMonths(1);
+                        setRenewStep('select');
+
+                        toast({ title: 'Membership Renewed', description: `Membership for ${member.fullName} has been renewed for ${months} ${months === 1 ? 'month' : 'months'}.` });
+                      }}
+                    >
+                      Confirm
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
