@@ -26,7 +26,22 @@ const App = () => {
 
   useEffect(() => {
     initLocalDb();
+    // Initialize auth from localStorage on first load
+    const storedAuth = localStorage.getItem("fk:isAuthenticated");
+    if (storedAuth === "true") {
+      setIsAuthenticated(true);
+    }
   }, []);
+
+  const handleLogin = () => {
+    localStorage.setItem("fk:isAuthenticated", "true");
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("fk:isAuthenticated");
+    setIsAuthenticated(false);
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -39,13 +54,13 @@ const App = () => {
               <>
                 <Route 
                   path="/auth/*" 
-                  element={<AuthLayout onLogin={() => setIsAuthenticated(true)} />} 
+                  element={<AuthLayout onLogin={handleLogin} />} 
                 />
                 <Route path="*" element={<Navigate to="/auth/login" replace />} />
               </>
             ) : (
               <>
-                <Route path="/" element={<DashboardLayout />}>
+                <Route path="/" element={<DashboardLayout onLogout={handleLogout} />}>
                   <Route index element={<Dashboard />} />
                   <Route path="members" element={<Members />} />
                   <Route path="members/add" element={<AddMember />} />

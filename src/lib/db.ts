@@ -1,8 +1,5 @@
 import Dexie, { type Table } from "dexie";
 import {
-  mockMembers,
-  mockAttendanceRecords,
-  mockRenewalRecords,
   type Member,
   type AttendanceRecord,
   type RenewalRecord,
@@ -44,19 +41,7 @@ export async function resetDatabase(): Promise<void> {
 }
 
 export async function seedDatabaseIfEmpty(): Promise<void> {
-  const seededFlagKey = "powerlift-db-seeded-v1";
-  if (localStorage.getItem(seededFlagKey)) return;
-
-  const memberCount = await db.members.count();
-  if (memberCount === 0) {
-    await db.transaction("rw", [db.members, db.attendance, db.renewals], async () => {
-      await db.members.bulkPut(mockMembers);
-      await db.attendance.bulkPut(mockAttendanceRecords);
-      await db.renewals.bulkPut(mockRenewalRecords);
-    });
-  }
-
-  localStorage.setItem(seededFlagKey, "1");
+  // No-op: remove mock auto-seeding so app starts with an empty database
 }
 
 export async function initLocalDb(): Promise<void> {

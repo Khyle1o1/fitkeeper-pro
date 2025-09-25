@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -12,8 +12,13 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const DashboardLayout = () => {
+interface DashboardLayoutProps {
+  onLogout?: () => void;
+}
+
+const DashboardLayout = ({ onLogout }: DashboardLayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navigation = [
@@ -94,7 +99,10 @@ const DashboardLayout = () => {
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  if (onLogout) onLogout();
+                  navigate('/auth/login', { replace: true });
+                }}
               >
                 <LogOut className="h-5 w-5" />
                 Logout
