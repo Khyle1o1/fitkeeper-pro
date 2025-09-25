@@ -285,7 +285,7 @@ const Attendance = () => {
                     <div className="flex items-center gap-3">
                       <span className="font-medium w-24">Status:</span>
                       <Badge className={(memberForAction.status === 'expired' || !memberForAction.isActive) ? 'bg-destructive/15 text-destructive border-destructive/30' : ''} variant={(memberForAction.status === 'expired' || !memberForAction.isActive) ? 'destructive' : 'outline'}>
-                        {memberForAction.status}
+                        {String(memberForAction.status).toUpperCase()}
                       </Badge>
                     </div>
                     {confirmType === 'checkout' && (

@@ -30,6 +30,7 @@ const AttendanceReport = () => {
         memberId: r.memberId,
         date: r.date,
         checkInTime: r.checkInTime,
+        checkOutTime: r.checkOutTime || '',
       }));
 
     exportTableToPdfWithLogo({
@@ -40,6 +41,7 @@ const AttendanceReport = () => {
         { header: 'Member ID', dataKey: 'memberId' },
         { header: 'Date', dataKey: 'date' },
         { header: 'Check-in', dataKey: 'checkInTime' },
+        { header: 'Check-out', dataKey: 'checkOutTime' },
       ],
       rows,
       filename: `attendance_${filters.startDate}_${filters.endDate}`,
@@ -148,7 +150,7 @@ const AttendanceReport = () => {
                     <p className="text-sm text-muted-foreground">ID: {record.memberId}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{record.checkInTime}</p>
+                    <p className="font-medium">{record.checkInTime}{record.checkOutTime ? ` • ${record.checkOutTime}` : ''}</p>
                     <p className="text-sm text-muted-foreground">{record.date}</p>
                   </div>
                 </div>
