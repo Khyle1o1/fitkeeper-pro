@@ -11,7 +11,7 @@ export interface Member {
   photoDataUrl?: string | null;
   qrCodeDataUrl?: string | null;
   barcodeDataUrl?: string | null;
-  status: 'active' | 'expired' | 'soon-to-expire';
+  status: 'active' | 'expired' | 'soon-to-expire' | 'archived';
   isActive: boolean;
 }
 
@@ -55,8 +55,11 @@ export const calculateExpiryDate = (startDate: string, months: number = 1): stri
 export const getMembershipStatus = (expiryDate: string): Member['status'] => {
   const today = new Date();
   const expiry = new Date(expiryDate);
-  const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  
+  const msPerDay = 1000 * 60 * 60 * 24;
+  // Positive if in future, negative if already expired
+  const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / msPerDay);
+
+  if (daysUntilExpiry <= -30) return 'archived';
   if (daysUntilExpiry < 0) return 'expired';
   if (daysUntilExpiry <= 7) return 'soon-to-expire';
   return 'active';

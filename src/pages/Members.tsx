@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Edit, Archive } from 'lucide-react';
+import { getMembershipStatus, type Member as MemberType } from '@/data/mockData';
 import { Member } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { db, initLocalDb } from '@/lib/db';
@@ -24,9 +26,38 @@ const Members = () => {
     const fetchMembers = async () => {
       await initLocalDb();
       const all = await db.members.toArray();
+
+      // Auto-update statuses based on dates (active -> expired -> archived)
+      const today = new Date();
+      const updates: Array<Promise<any>> = [];
+      const updatedMembers = (all as Member[]).map((m) => {
+        // Determine computed status based on expiry date
+        const computed = getMembershipStatus(m.membershipExpiryDate);
+        let next: Member = { ...m };
+        if (computed !== m.status) {
+          next.status = computed as Member['status'];
+          // Archived implies inactive
+          if (computed === 'archived') {
+            next.isActive = false as any;
+          }
+          updates.push(db.members.update(m.id, { status: computed, isActive: next.isActive } as any));
+          if (computed === 'expired') {
+            toast({ title: 'Membership Expired', description: `Member ${m.fullName} has expired. Renew within 30 days to avoid archiving.` });
+          }
+          if (computed === 'archived') {
+            toast({ title: 'Member Archived', description: `Member ${m.fullName} has been archived due to no renewal within 30 days.` });
+          }
+        }
+        return next;
+      });
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+      }
+
       // Sort by full name
-      all.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
-      setMembers(all as any);
+      updatedMembers.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
+      setMembers(updatedMembers as any);
     };
 
     fetchMembers();
@@ -39,19 +70,50 @@ const Members = () => {
   );
 
   const handleArchiveMember = async (memberId: string) => {
-    await db.members.update(memberId, { isActive: false } as any);
-    setMembers(prev => prev.map(member => member.id === memberId ? { ...member, isActive: false } : member));
+    await db.members.update(memberId, { isActive: false, status: 'archived' } as any);
+    setMembers(prev => prev.map(member => member.id === memberId ? { ...member, isActive: false, status: 'archived' } : member));
     toast({ title: 'Member Archived', description: 'Member has been successfully archived.' });
+  };
+
+  const handleRenew = async (memberId: string) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+
+    const currentExpiry = new Date(member.membershipExpiryDate);
+    // If expired/archived, renew from today; otherwise extend from current expiry
+    const baseDate = (member.status === 'expired' || member.status === 'archived') ? new Date() : currentExpiry;
+    const newExpiry = new Date(baseDate);
+    newExpiry.setMonth(newExpiry.getMonth() + (member.membershipDurationMonths || 1));
+    const iso = newExpiry.toISOString().split('T')[0];
+
+    await db.members.update(memberId, { 
+      membershipStartDate: new Date().toISOString().split('T')[0],
+      membershipExpiryDate: iso,
+      status: 'active',
+      isActive: true,
+    } as any);
+
+    setMembers(prev => prev.map(m => m.id === memberId ? { 
+      ...m,
+      membershipStartDate: new Date().toISOString().split('T')[0],
+      membershipExpiryDate: iso,
+      status: 'active',
+      isActive: true,
+    } : m));
+
+    toast({ title: 'Membership Renewed', description: `Member ${member.fullName} has been renewed and is now Active.` });
   };
 
   const getStatusBadge = (status: Member['status']) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-success/10 text-success border-success/20">Active</Badge>;
+        return <Badge className="bg-green-100 text-green-700 border-green-200">🟢 Active</Badge>;
       case 'expired':
-        return <Badge variant="destructive">Expired</Badge>;
+        return <Badge className="bg-orange-100 text-orange-700 border-orange-200">🟠 Expired</Badge>;
+      case 'archived':
+        return <Badge className="bg-gray-100 text-gray-700 border-gray-200">⚫ Archived</Badge>;
       case 'soon-to-expire':
-        return <Badge className="bg-warning/10 text-warning border-warning/20">Expiring Soon</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">Expiring Soon</Badge>;
       default:
         return <Badge variant="secondary">Unknown</Badge>;
     }
@@ -115,61 +177,187 @@ const Members = () => {
         </CardContent>
       </Card>
 
-      {/* Members List */}
-      <Card className="border-0 shadow-md">
-        <CardHeader>
-          <CardTitle>All Members ({filteredMembers.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredMembers.length > 0 ? (
-              filteredMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
-                  onClick={() => openMemberDialog(member)}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <h3 className="font-semibold">{member.fullName}</h3>
-                        <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+      {/* Members List with Tabs */}
+      <Tabs defaultValue="active">
+        <TabsList>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="expired">Expired</TabsTrigger>
+          <TabsTrigger value="archived">Archived</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active">
+          <Card className="border-0 shadow-md">
+            <CardHeader>
+              <CardTitle>
+                Active Members ({filteredMembers.filter(m => m.status === 'active' && m.isActive).length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredMembers.filter(m => m.status === 'active' && m.isActive).length > 0 ? (
+                  filteredMembers.filter(m => m.status === 'active' && m.isActive).map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => openMemberDialog(member)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <h3 className="font-semibold">{member.fullName}</h3>
+                            <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                          </div>
+                          <div className="hidden md:block">
+                            <p className="text-sm">{member.email}</p>
+                            <p className="text-sm text-muted-foreground">{member.phone}</p>
+                          </div>
+                          <div className="hidden lg:block">
+                            <p className="text-sm">Start: {member.membershipStartDate}</p>
+                            <p className="text-sm text-muted-foreground">Expires: {member.membershipExpiryDate}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="hidden md:block">
-                        <p className="text-sm">{member.email}</p>
-                        <p className="text-sm text-muted-foreground">{member.phone}</p>
-                      </div>
-                      <div className="hidden lg:block">
-                        <p className="text-sm">Start: {member.membershipStartDate}</p>
-                        <p className="text-sm text-muted-foreground">Expires: {member.membershipExpiryDate}</p>
+                      <div className="flex items-center gap-4">
+                        {getStatusBadge(member.status)}
+                        <div className="flex gap-2">
+                          {member.isActive && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); handleArchiveMember(member.id); }}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Archive className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No active members match your search.</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    {getStatusBadge(member.status)}
-                    <div className="flex gap-2">
-                      {member.isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleArchiveMember(member.id); }}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Archive className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No members found matching your search.</p>
+                )}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="expired">
+          <Card className="border-0 shadow-md">
+            <CardHeader>
+              <CardTitle>
+                Expired ({filteredMembers.filter(m => m.status === 'expired' && m.isActive).length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredMembers.filter(m => m.status === 'expired' && m.isActive).length > 0 ? (
+                  filteredMembers.filter(m => m.status === 'expired' && m.isActive).map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => openMemberDialog(member)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <h3 className="font-semibold">{member.fullName}</h3>
+                            <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                          </div>
+                          <div className="hidden md:block">
+                            <p className="text-sm">{member.email}</p>
+                            <p className="text-sm text-muted-foreground">{member.phone}</p>
+                          </div>
+                          <div className="hidden lg:block">
+                            <p className="text-sm">Start: {member.membershipStartDate}</p>
+                            <p className="text-sm text-muted-foreground">Expires: {member.membershipExpiryDate}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {getStatusBadge(member.status)}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); handleRenew(member.id); }}
+                            className="text-green-700 border-green-200 hover:bg-green-50"
+                          >
+                            Renew
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No expired members match your search.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <Card className="border-0 shadow-md">
+            <CardHeader>
+              <CardTitle>
+                Archived ({filteredMembers.filter(m => m.status === 'archived' || !m.isActive).length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredMembers.filter(m => m.status === 'archived' || !m.isActive).length > 0 ? (
+                  filteredMembers.filter(m => m.status === 'archived' || !m.isActive).map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => openMemberDialog(member)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <h3 className="font-semibold">{member.fullName}</h3>
+                            <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                          </div>
+                          <div className="hidden md:block">
+                            <p className="text-sm">{member.email}</p>
+                            <p className="text-sm text-muted-foreground">{member.phone}</p>
+                          </div>
+                          <div className="hidden lg:block">
+                            <p className="text-sm">Start: {member.membershipStartDate}</p>
+                            <p className="text-sm text-muted-foreground">Expires: {member.membershipExpiryDate}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {getStatusBadge(member.status === 'archived' ? 'archived' : member.status)}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); handleRenew(member.id); }}
+                            className="text-green-700 border-green-200 hover:bg-green-50"
+                          >
+                            Renew
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No archived members match your search.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => (open ? setIsDialogOpen(true) : closeMemberDialog())}>
         <DialogContent>
