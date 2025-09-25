@@ -24,8 +24,9 @@ const Reports = () => {
         record.date.startsWith(currentMonth)
       ).length;
       
-      // Get active members
-      const activeMembers = await db.members.where('isActive').equals(true).and(m => m.status === 'active').toArray();
+      // Get active members (IndexedDB cannot index boolean keys reliably; query by string index then filter)
+      const activeMembers = (await db.members.where('status').equals('active').toArray())
+        .filter(m => m.isActive === true);
       
       // Get expiring members (next 7 days)
       const today = new Date();
