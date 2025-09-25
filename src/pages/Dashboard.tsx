@@ -1,58 +1,91 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Users, UserCheck, AlertTriangle, Clock, Trash2 } from 'lucide-react';
+import { db, initLocalDb, clearAllData, resetDatabase } from '@/lib/db';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const [totalActiveMembers, setTotalActiveMembers] = useState(0);
   const [dailyAttendance, setDailyAttendance] = useState(0);
   const [todayAttendance, setTodayAttendance] = useState<any[]>([]);
   const [expiringMembers, setExpiringMembers] = useState<any[]>([]);
+  const [currentTime, setCurrentTime] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadStats = async () => {
-      // Total active members
-      const { count: activeCount } = await supabase
-        .from('members')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true)
-        .eq('status', 'active');
-      setTotalActiveMembers(activeCount ?? 0);
+      await initLocalDb();
+      
+      // Total active members (avoid boolean index queries which break IDBKeyRange)
+      const allMembersForActive = await db.members.toArray();
+      const activeMembers = allMembersForActive.filter((m: any) => m.isActive && m.status === 'active');
+      setTotalActiveMembers(activeMembers.length);
 
-      // Today's attendance list and count
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
-
-      const { data: attendanceData } = await supabase
-        .from('attendance')
-        .select('*')
-        .gte('checked_in_at', start.toISOString())
-        .lte('checked_in_at', end.toISOString())
-        .order('checked_in_at', { ascending: false });
-
-      setTodayAttendance(attendanceData ?? []);
-      setDailyAttendance(attendanceData?.length ?? 0);
+      // Today's attendance
+      const today = new Date().toISOString().split('T')[0];
+      const attendanceData = await db.attendance.where('date').equals(today).toArray();
+      attendanceData.sort((a: any, b: any) => (b.id > a.id ? 1 : -1));
+      
+      setTodayAttendance(attendanceData);
+      setDailyAttendance(attendanceData.length);
 
       // Expiring in next 7 days
-      const today = new Date();
+      const todayDate = new Date();
       const in7 = new Date();
-      in7.setDate(today.getDate() + 7);
-
-      const { data: expiring } = await supabase
-        .from('members')
-        .select('*')
-        .eq('is_active', true)
-        .gte('membership_expiry_date', today.toISOString().split('T')[0])
-        .lte('membership_expiry_date', in7.toISOString().split('T')[0])
-        .order('membership_expiry_date', { ascending: true });
-
-      setExpiringMembers(expiring ?? []);
+      in7.setDate(todayDate.getDate() + 7);
+      
+      const allMembers = allMembersForActive.filter((m: any) => m.isActive);
+      const expiring = allMembers.filter((member: any) => {
+        const expiryDate = new Date(member.membershipExpiryDate);
+        return expiryDate >= todayDate && expiryDate <= in7;
+      });
+      
+      setExpiringMembers(expiring);
     };
 
     loadStats();
+    
+    // Update time every second
+    const updateTime = () => {
+      const now = new Date();
+      const timeStr = now.toLocaleString('en-US', {
+        timeZone: 'Asia/Manila',
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      });
+      setCurrentTime(timeStr);
+    };
+    
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    
+    return () => clearInterval(interval);
   }, []);
+
+  const handleClearAllData = async () => {
+    if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+      await clearAllData();
+      toast({
+        title: 'Data Cleared',
+        description: 'All members, attendance, and renewal data has been cleared.',
+      });
+      // Reload stats
+      window.location.reload();
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    if (confirm('Are you sure you want to reset the database? This will fix schema issues but clear all data.')) {
+      await resetDatabase();
+      toast({
+        title: 'Database Reset',
+        description: 'Database has been reset with new schema.',
+      });
+      // Reload stats
+      window.location.reload();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -60,6 +93,34 @@ const Dashboard = () => {
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Welcome back! Here's what's happening at your gym today.</p>
+        <div className="flex items-center justify-between mt-2">
+          {currentTime && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Manila Time: {currentTime}</span>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetDatabase}
+              className="text-orange-600 hover:text-orange-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Reset DB
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearAllData}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Data
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -120,11 +181,11 @@ const Dashboard = () => {
                 todayAttendance.map((record) => (
                   <div key={record.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                     <div>
-                      <p className="font-medium">{record.member_name}</p>
-                      <p className="text-sm text-muted-foreground">ID: {record.member_id}</p>
+                      <p className="font-medium">{record.memberName}</p>
+                      <p className="text-sm text-muted-foreground">ID: {record.memberId}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">{new Date(record.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+                      <p className="font-medium">{record.checkInTime}</p>
                       <p className="text-sm text-muted-foreground">Today</p>
                     </div>
                   </div>
@@ -151,11 +212,11 @@ const Dashboard = () => {
                 expiringMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-3 bg-warning/5 border border-warning/20 rounded-lg">
                     <div>
-                      <p className="font-medium">{member.full_name}</p>
+                      <p className="font-medium">{member.fullName}</p>
                       <p className="text-sm text-muted-foreground">ID: {member.id}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-warning">Expires {member.membership_expiry_date}</p>
+                      <p className="font-medium text-warning">Expires {member.membershipExpiryDate}</p>
                       <p className="text-sm text-muted-foreground">Renewal needed</p>
                     </div>
                   </div>

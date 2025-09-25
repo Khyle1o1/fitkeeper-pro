@@ -1,13 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  // eslint-disable-next-line no-console
-  console.warn('Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-}
-
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');
+// Offline-only build: provide a minimal no-op supabase-like object to avoid runtime errors.
+export const supabase = {
+  from() {
+    return {
+      select: async () => ({ data: [], error: { message: 'Supabase disabled (offline mode)' } }),
+      insert: async () => ({ error: { message: 'Supabase disabled (offline mode)' } }),
+      update: async () => ({ error: { message: 'Supabase disabled (offline mode)' } }),
+      eq: function () { return this; },
+      gte: function () { return this; },
+      lte: function () { return this; },
+      order: function () { return this; },
+      limit: function () { return this; },
+    } as any;
+  },
+} as const;
 
 

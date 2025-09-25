@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Edit, Archive } from 'lucide-react';
 import { Member } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { db, initLocalDb } from '@/lib/db';
 
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -16,28 +16,11 @@ const Members = () => {
 
   useEffect(() => {
     const fetchMembers = async () => {
-      const { data, error } = await supabase
-        .from('members')
-        .select('*')
-        .order('full_name', { ascending: true });
-
-      if (error) {
-        toast({ title: 'Failed to load members', description: error.message, variant: 'destructive' });
-        return;
-      }
-
-      const mapped: Member[] = (data ?? []).map((row: any) => ({
-        id: row.id,
-        fullName: row.full_name,
-        email: row.email,
-        phone: row.phone,
-        membershipStartDate: row.membership_start_date,
-        membershipExpiryDate: row.membership_expiry_date,
-        status: row.status,
-        isActive: row.is_active,
-      }));
-
-      setMembers(mapped);
+      await initLocalDb();
+      const all = await db.members.toArray();
+      // Sort by full name
+      all.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
+      setMembers(all as any);
     };
 
     fetchMembers();
@@ -50,19 +33,8 @@ const Members = () => {
   );
 
   const handleArchiveMember = async (memberId: string) => {
-    const { error } = await supabase
-      .from('members')
-      .update({ is_active: false })
-      .eq('id', memberId);
-
-    if (error) {
-      toast({ title: 'Failed to archive', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    setMembers(prev => prev.map(member =>
-      member.id === memberId ? { ...member, isActive: false } : member
-    ));
+    await db.members.update(memberId, { isActive: false } as any);
+    setMembers(prev => prev.map(member => member.id === memberId ? { ...member, isActive: false } : member));
     toast({ title: 'Member Archived', description: 'Member has been successfully archived.' });
   };
 

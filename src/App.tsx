@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { initLocalDb } from "@/lib/db";
 
 // Pages
 import AuthLayout from "./pages/AuthLayout";
@@ -22,6 +23,10 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    initLocalDb();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

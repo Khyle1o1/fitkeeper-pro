@@ -50,12 +50,15 @@ const DashboardLayout = () => {
         />
       )}
 
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen items-stretch">
         {/* Sidebar */}
         <div className={cn(
           "lg:w-64 lg:flex-shrink-0 lg:block",
-          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border lg:static lg:z-auto lg:h-screen",
-          isSidebarOpen ? "block" : "hidden lg:block"
+          // Mobile: fixed overlay; Desktop: sticky and stretches with content
+          isSidebarOpen
+            ? "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border lg:static lg:inset-auto"
+            : "hidden lg:block bg-card border-r border-border lg:sticky lg:top-0",
+          "lg:self-stretch"
         )}>
           <div className="h-full flex flex-col">
             {/* Logo */}

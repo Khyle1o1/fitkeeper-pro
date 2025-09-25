@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { QrCode, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { db, initLocalDb } from '@/lib/db';
 
 const Attendance = () => {
   const [memberId, setMemberId] = useState('');
@@ -15,43 +15,23 @@ const Attendance = () => {
   const { toast } = useToast();
 
   const refreshTodayAttendance = async () => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*')
-      .gte('checked_in_at', start.toISOString())
-      .lte('checked_in_at', end.toISOString())
-      .order('checked_in_at', { ascending: false });
-
-    if (error) {
-      toast({ title: 'Failed to load attendance', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    setTodayAttendance(data ?? []);
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const records = await db.attendance.where('date').equals(dateStr).toArray();
+    // Sort latest first by id (timestamp-based below)
+    records.sort((a: any, b: any) => (b.id > a.id ? 1 : -1));
+    setTodayAttendance(records);
   };
 
   useEffect(() => {
-    refreshTodayAttendance();
+    (async () => {
+      await initLocalDb();
+      refreshTodayAttendance();
+    })();
   }, []);
 
   const handleCheckIn = async () => {
-    const { data: members, error: memberErr } = await supabase
-      .from('members')
-      .select('*')
-      .eq('id', memberId)
-      .limit(1);
-
-    if (memberErr) {
-      toast({ title: 'Lookup failed', description: memberErr.message, variant: 'destructive' });
-      return;
-    }
-
-    const member = members?.[0];
+    const member = await db.members.get(memberId);
     if (!member) {
       toast({
         title: 'Member Not Found',
@@ -66,29 +46,28 @@ const Attendance = () => {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
+      timeZone: 'Asia/Manila',
     });
 
-    const { error: insertErr } = await supabase.from('attendance').insert({
-      member_id: member.id,
-      member_name: member.full_name,
-      checked_in_at: now.toISOString(),
-    });
-
-    if (insertErr) {
-      toast({ title: 'Failed to check in', description: insertErr.message, variant: 'destructive' });
-      return;
-    }
+    const dateStr = now.toISOString().split('T')[0];
+    await db.attendance.add({
+      id: `${Date.now()}`,
+      memberId: member.id,
+      memberName: member.fullName,
+      date: dateStr,
+      checkInTime,
+    } as any);
 
     setCheckedInMember({
       id: member.id,
-      fullName: member.full_name,
+      fullName: member.fullName,
       status: member.status,
       checkInTime,
     });
 
     toast({
       title: 'Check-in Successful',
-      description: `${member.full_name} checked in at ${checkInTime}`,
+      description: `${member.fullName} checked in at ${checkInTime}`,
     });
 
     setMemberId('');
@@ -156,11 +135,11 @@ const Attendance = () => {
               {todayAttendance.map((record) => (
                 <div key={record.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
-                    <p className="font-medium">{record.member_name}</p>
-                    <p className="text-sm text-muted-foreground">ID: {record.member_id}</p>
+                    <p className="font-medium">{record.memberName}</p>
+                    <p className="text-sm text-muted-foreground">ID: {record.memberId}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{new Date(record.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+                    <p className="font-medium">{record.checkInTime}</p>
                     <Badge variant="outline" className="text-xs">Active</Badge>
                   </div>
                 </div>

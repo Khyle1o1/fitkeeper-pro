@@ -1,9 +1,56 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Users, UserCheck, ArrowRight } from 'lucide-react';
+import { db, initLocalDb } from '@/lib/db';
 
 const Reports = () => {
+  const [stats, setStats] = useState({
+    totalCheckIns: 0,
+    activeMembers: 0,
+    expiringMembers: 0,
+    retentionRate: 0,
+  });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      await initLocalDb();
+      
+      // Get current month check-ins
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const allAttendance = await db.attendance.toArray();
+      const monthlyCheckIns = allAttendance.filter(record => 
+        record.date.startsWith(currentMonth)
+      ).length;
+      
+      // Get active members
+      const activeMembers = await db.members.where('isActive').equals(true).and(m => m.status === 'active').toArray();
+      
+      // Get expiring members (next 7 days)
+      const today = new Date();
+      const in7 = new Date();
+      in7.setDate(today.getDate() + 7);
+      const expiring = activeMembers.filter(member => {
+        const expiryDate = new Date(member.membershipExpiryDate);
+        return expiryDate >= today && expiryDate <= in7;
+      });
+      
+      // Calculate retention rate (simplified)
+      const totalMembers = await db.members.count();
+      const retentionRate = totalMembers > 0 ? Math.round((activeMembers.length / totalMembers) * 100) : 0;
+      
+      setStats({
+        totalCheckIns: monthlyCheckIns,
+        activeMembers: activeMembers.length,
+        expiringMembers: expiring.length,
+        retentionRate,
+      });
+    };
+    
+    loadStats();
+  }, []);
+
   const reports = [
     {
       title: 'Attendance Report',
@@ -66,19 +113,19 @@ const Reports = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-primary">156</p>
+              <p className="text-2xl font-bold text-primary">{stats.totalCheckIns}</p>
               <p className="text-sm text-muted-foreground">Total Check-ins This Month</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-success">45</p>
+              <p className="text-2xl font-bold text-success">{stats.activeMembers}</p>
               <p className="text-sm text-muted-foreground">Active Members</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-warning">8</p>
+              <p className="text-2xl font-bold text-warning">{stats.expiringMembers}</p>
               <p className="text-sm text-muted-foreground">Expiring Memberships</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-accent">92%</p>
+              <p className="text-2xl font-bold text-accent">{stats.retentionRate}%</p>
               <p className="text-sm text-muted-foreground">Member Retention Rate</p>
             </div>
           </div>

@@ -7,6 +7,10 @@ export interface Member {
   phone: string;
   membershipStartDate: string;
   membershipExpiryDate: string;
+  membershipDurationMonths?: number;
+  photoDataUrl?: string | null;
+  qrCodeDataUrl?: string | null;
+  barcodeDataUrl?: string | null;
   status: 'active' | 'expired' | 'soon-to-expire';
   isActive: boolean;
 }
@@ -34,10 +38,15 @@ export const generateMemberId = (): string => {
   return `GM${Date.now().toString().slice(-6)}`;
 };
 
-// Calculate expiry date (1 month from start date)
-export const calculateExpiryDate = (startDate: string): string => {
+// Calculate expiry date based on duration in months (defaults to 1 month)
+export const calculateExpiryDate = (startDate: string, months: number = 1): string => {
   const date = new Date(startDate);
-  date.setMonth(date.getMonth() + 1);
+  const startDay = date.getDate();
+  date.setMonth(date.getMonth() + months);
+  // Handle month overflow to keep end-of-month consistent
+  if (date.getDate() !== startDay) {
+    date.setDate(0);
+  }
   return date.toISOString().split('T')[0];
 };
 
