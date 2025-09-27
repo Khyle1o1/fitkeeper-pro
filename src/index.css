@@ -164,4 +164,33 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* QR Scanner Styles for Native Mobile */
+  .qrscanner-active {
+    background: transparent !important;
+  }
+  
+  .qrscanner-active * {
+    background: transparent !important;
+    color: transparent !important;
+  }
+  
+  .qrscanner-active .qr-scanner-overlay {
+    background: transparent !important;
+  }
+  
+  /* Ensure native scanner camera view is visible */
+  .qrscanner-active body {
+    background: transparent !important;
+  }
+  
+  .qrscanner-active #root {
+    background: transparent !important;
+  }
+  
+  /* Hide all UI elements when native scanner is active */
+  .qrscanner-active [data-radix-dialog-content],
+  .qrscanner-active [data-radix-dialog-overlay] {
+    display: none !important;
+  }
 }

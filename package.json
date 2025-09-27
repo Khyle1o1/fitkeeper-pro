@@ -15,7 +15,8 @@
     "cap:copy": "cap copy"
   },
   "dependencies": {
-    "@capacitor/core": "^6.2.0",
+    "@capacitor/barcode-scanner": "^2.1.0",
+    "@capacitor/core": "^7.4.3",
     "@capacitor/filesystem": "^6.0.3",
     "@capacitor/share": "^6.0.3",
     "@hookform/resolvers": "^3.10.0",
@@ -60,6 +61,7 @@
     "jspdf-autotable": "5.0.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -75,8 +77,8 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/cli": "^6.2.0",
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/cli": "^7.4.3",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",

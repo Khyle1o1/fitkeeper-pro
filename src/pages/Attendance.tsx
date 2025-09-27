@@ -4,9 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { QrCode, UserCheck } from 'lucide-react';
+import { QrCode, UserCheck, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db, initLocalDb } from '@/lib/db';
+import QRScanner from '@/components/QRScanner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,7 @@ const Attendance = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmType, setConfirmType] = useState<'checkin' | 'checkout'>('checkin');
   const [memberForAction, setMemberForAction] = useState<any>(null);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
 
   const refreshTodayAttendance = async () => {
     const today = new Date();
@@ -49,8 +51,13 @@ const Attendance = () => {
     setConfirmOpen(true);
   };
 
-  const handleCheckIn = async () => {
-    const member = await db.members.get(memberId);
+  const handleQRScan = async (scannedId: string) => {
+    setMemberId(scannedId);
+    await processMemberId(scannedId);
+  };
+
+  const processMemberId = async (id: string) => {
+    const member = await db.members.get(id);
     if (!member) {
       toast({
         title: 'Member Not Found',
@@ -59,22 +66,25 @@ const Attendance = () => {
       });
       return;
     }
-    // Prevent duplicate check-in if already checked in today without checkout
+
+    // Check if member is already checked in today
     const todayStr = new Date().toISOString().split('T')[0];
     const todayRecords = await db.attendance.where('date').equals(todayStr).toArray();
     const existing = [...todayRecords]
       .filter((r: any) => r.memberId === member.id)
       .sort((a: any, b: any) => (b.id > a.id ? 1 : -1))[0];
-    if (existing && !existing.checkOutTime) {
-      toast({
-        title: 'Already Checked In',
-        description: `${member.fullName} already checked in at ${existing.checkInTime}.`,
-        variant: 'destructive',
-      });
-      return;
-    }
 
-    openConfirm('checkin', member);
+    if (existing && !existing.checkOutTime) {
+      // Member is already checked in, offer check out
+      openConfirm('checkout', member);
+    } else {
+      // Member is not checked in, offer check in
+      openConfirm('checkin', member);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    await processMemberId(memberId);
   };
 
   const performCheckIn = async (member: any) => {
@@ -112,30 +122,7 @@ const Attendance = () => {
   };
 
   const handleCheckOut = async () => {
-    const member = await db.members.get(memberId);
-    if (!member) {
-      toast({
-        title: 'Member Not Found',
-        description: 'No member found with this ID. Please check and try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    // Ensure there is a check-in today to check out from
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayRecords = await db.attendance.where('date').equals(todayStr).toArray();
-    const latest = [...todayRecords]
-      .filter((r: any) => r.memberId === member.id)
-      .sort((a: any, b: any) => (b.id > a.id ? 1 : -1))[0];
-    if (!latest || latest.checkOutTime) {
-      toast({
-        title: 'No Active Check-in',
-        description: `${member.fullName} has no active check-in to check out from today.`,
-      });
-      return;
-    }
-
-    openConfirm('checkout', member);
+    await processMemberId(memberId);
   };
 
   const performCheckOut = async (member: any) => {
@@ -184,16 +171,40 @@ const Attendance = () => {
                   value={memberId}
                   onChange={(e) => setMemberId(e.target.value)}
                   placeholder="Enter or scan Member ID (e.g., GM001234)"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && memberId) {
+                      handleCheckIn();
+                    }
+                  }}
                 />
-                <Button onClick={handleCheckIn} disabled={!memberId} className="bg-gradient-primary hover:opacity-90">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setQrScannerOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Camera className="h-4 w-4" />
+                  Scan
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleCheckIn} 
+                  disabled={!memberId} 
+                  className="bg-gradient-primary hover:opacity-90 flex-1"
+                >
                   Check In
                 </Button>
-                <Button variant="outline" onClick={handleCheckOut} disabled={!memberId}>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCheckOut} 
+                  disabled={!memberId}
+                  className="flex-1"
+                >
                   Check Out
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Enter Member ID manually or simulate QR/barcode scanning
+                Enter Member ID manually or use the camera to scan QR code/barcode
               </p>
             </div>
 
@@ -244,7 +255,14 @@ const Attendance = () => {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmType === 'checkin' ? 'Confirm Check-in' : 'Confirm Check-out'}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirmType === 'checkin' ? 'Confirm Check-in' : 'Confirm Check-out'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmType === 'checkin' 
+                ? 'Please verify the member details before checking in.' 
+                : 'Please verify the member details before checking out.'}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           {memberForAction && (
             <div className="relative overflow-hidden border border-border/50 rounded-lg bg-muted/10">
@@ -336,6 +354,13 @@ const Attendance = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={qrScannerOpen}
+        onClose={() => setQrScannerOpen(false)}
+        onScan={handleQRScan}
+      />
     </div>
   );
 };
