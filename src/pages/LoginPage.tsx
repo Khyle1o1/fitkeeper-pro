@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Dumbbell } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getUserByUsername, updateUser } from '@/lib/db';
 import { verifyPassword } from '@/lib/auth';
@@ -22,12 +22,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [isLocked, setIsLocked] = useState(false);
   const { toast } = useToast();
 
-  const passwordRequirements = [
-    'Minimum 8 characters',
-    'At least one special character (!@#$%^&*)',
-    'At least one uppercase letter',
-    'At least one lowercase letter',
-  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,12 +123,14 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
     <Card className="w-full shadow-lg border-0 bg-card/95 backdrop-blur">
       <CardHeader className="space-y-4 text-center">
         <div className="flex justify-center">
-          <div className="p-3 bg-gradient-primary rounded-full">
-            <Dumbbell className="h-8 w-8 text-white" />
-          </div>
+            <img 
+              src="/logo.png" 
+              alt="Power Lift Fitness Gym Logo" 
+              className="h-20 w-20 object-contain"
+            />
         </div>
         <div>
-          <CardTitle className="text-2xl font-bold">Gym Management System</CardTitle>
+          <CardTitle className="text-2xl font-bold">Power Lift Fitness Gym</CardTitle>
           <CardDescription className="text-muted-foreground">
             Sign in to access your dashboard
           </CardDescription>
@@ -192,14 +188,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
             </div>
           </div>
 
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <p className="text-sm font-medium text-foreground mb-2">Password Requirements:</p>
-            <ul className="text-xs text-muted-foreground space-y-1">
-              {passwordRequirements.map((req, index) => (
-                <li key={index}>• {req}</li>
-              ))}
-            </ul>
-          </div>
 
           <Button 
             type="submit" 

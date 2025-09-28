@@ -26,6 +26,13 @@ const SignupPage = ({ onSignup }: SignupPageProps) => {
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
+  const passwordRequirements = [
+    'Minimum 8 characters',
+    'At least one special character (!@#$%^&*)',
+    'At least one uppercase letter',
+    'At least one lowercase letter',
+  ];
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
@@ -84,10 +91,8 @@ const SignupPage = ({ onSignup }: SignupPageProps) => {
 
       // Hash password and create user
       const passwordHash = await hashPassword(formData.password);
-      const userId = generateUserId();
       
       await createUser({
-        id: userId,
         username: formData.username,
         email: formData.email,
         passwordHash,
@@ -116,11 +121,22 @@ const SignupPage = ({ onSignup }: SignupPageProps) => {
 
   return (
     <Card className="w-full shadow-lg border-0 bg-card/95 backdrop-blur">
-      <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-        <CardDescription>
-          Create a new account to access the Gym Management System
-        </CardDescription>
+      <CardHeader className="space-y-4 text-center">
+        <div className="flex justify-center">
+          <div className="p-3 bg-gradient-primary rounded-full">
+            <img 
+              src="/logo.png" 
+              alt="Power Lift Fitness Gym Logo" 
+              className="h-8 w-8 object-contain"
+            />
+          </div>
+        </div>
+        <div>
+          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+          <CardDescription>
+            Create a new account to access Power Lift Fitness Gym
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -171,13 +187,22 @@ const SignupPage = ({ onSignup }: SignupPageProps) => {
               onChange={(e) => handleInputChange('password', e.target.value)}
               required
             />
-            {passwordErrors.length > 0 && (
-              <ul className="text-sm text-destructive space-y-1">
-                {passwordErrors.map((error, index) => (
-                  <li key={index}>• {error}</li>
-                ))}
-              </ul>
-            )}
+                  {passwordErrors.length > 0 && (
+                    <ul className="text-sm text-destructive space-y-1">
+                      {passwordErrors.map((error, index) => (
+                        <li key={index}>• {error}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-foreground mb-2">Password Requirements:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    {passwordRequirements.map((req, index) => (
+                      <li key={index}>• {req}</li>
+                    ))}
+                  </ul>
           </div>
 
           <div className="space-y-2">

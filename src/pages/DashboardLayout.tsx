@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import Footer from '@/components/Footer';
 
 interface DashboardLayoutProps {
   onLogout?: () => void;
@@ -39,7 +40,14 @@ const DashboardLayout = ({ onLogout }: DashboardLayoutProps) => {
     <div className="min-h-screen bg-background">
       {/* Mobile Header */}
       <div className="lg:hidden bg-card border-b border-border px-4 py-3 flex items-center justify-between">
-        <h1 className="font-bold text-lg">Gym Management</h1>
+        <div className="flex items-center space-x-2">
+          <img 
+            src="/logo.png" 
+            alt="Power Lift Fitness Gym Logo" 
+            className="h-6 w-6 object-contain"
+          />
+          <h1 className="font-bold text-lg">Power Lift Fitness</h1>
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -69,10 +77,13 @@ const DashboardLayout = ({ onLogout }: DashboardLayoutProps) => {
         )}>
           <div className="h-full flex flex-col">
             {/* Logo */}
-            <div className="p-6 border-b border-border">
-              <h2 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Gym Management
-              </h2>
+            <div className="p-6 border-b border-border flex items-center justify-center">
+              <div className="flex items-center space-x-3">
+              
+                <h2 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                  Power Lift Fitness
+                </h2>
+              </div>
             </div>
 
             {/* Navigation */}
@@ -114,10 +125,11 @@ const DashboardLayout = ({ onLogout }: DashboardLayoutProps) => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 lg:ml-0 min-h-screen">
-          <div className="p-6">
+        <div className="flex-1 lg:ml-0 min-h-screen flex flex-col">
+          <div className="flex-1 p-6">
             <Outlet />
           </div>
+          <Footer />
         </div>
       </div>
     </div>
