@@ -36,38 +36,29 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
       setIsInitializing(true);
       setError(null);
       
-      console.log('🔍 Checking platform...');
-      
       // Check if we're running in a native Capacitor app
       const isNativePlatform = Capacitor.isNativePlatform();
-      console.log('📱 Is native platform:', isNativePlatform);
       setIsNative(isNativePlatform);
 
       if (isNativePlatform) {
-        console.log('🤖 Native platform detected, checking scanner...');
         try {
           // For native apps, check if barcode scanner plugin is available
           await checkNativeScanner();
         } catch (nativeError) {
-          console.warn('⚠️ Native scanner failed, falling back to web scanner:', nativeError);
           // Fallback to web scanner if native fails
           setIsNative(false);
           await checkWebPermissions();
         }
       } else {
-        console.log('🌐 Web platform detected, checking permissions...');
         // For web browsers, check camera permissions
         await checkWebPermissions();
       }
       
-      console.log('✅ Platform check completed successfully');
       setScannerReady(true);
     } catch (err: any) {
-      console.error('❌ Platform check error:', err);
       const errorMessage = err?.message || 'Unknown error';
       setError(`Failed to initialize scanner: ${errorMessage}`);
       
-      // Show more specific error in toast
       toast({
         title: 'Scanner Initialization Failed',
         description: errorMessage,
@@ -80,9 +71,6 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
 
   const checkNativeScanner = async () => {
     try {
-      console.log('📦 Checking barcode scanner plugin...');
-      console.log('📱 CapacitorBarcodeScanner object:', CapacitorBarcodeScanner);
-      
       if (!CapacitorBarcodeScanner) {
         throw new Error('CapacitorBarcodeScanner object is undefined');
       }
@@ -91,16 +79,10 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
         throw new Error('scanBarcode method is not available');
       }
       
-      console.log('✅ Barcode scanner plugin available');
-      console.log('🔐 Checking camera permissions...');
-      
       // For the new plugin, we'll test by trying to scan with a simple test
       // If it fails due to permissions, we'll handle it in the scanning function
       setHasPermission(true); // Assume permission is available, will be checked during scan
-      
-      console.log('✅ Native scanner check completed successfully');
     } catch (err: any) {
-      console.error('❌ Native scanner check error:', err);
       const errorMessage = err?.message || 'Unknown error';
       throw new Error(`Native scanner unavailable: ${errorMessage}`);
     }
@@ -108,25 +90,19 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
 
   const checkWebPermissions = async () => {
     try {
-      console.log('🌐 Checking web camera permissions...');
-      
       // Check if camera is available
       const devices = await navigator.mediaDevices.enumerateDevices();
       const hasCamera = devices.some(device => device.kind === 'videoinput');
-      console.log('📷 Camera available:', hasCamera);
       
       if (!hasCamera) {
         throw new Error('No camera found on this device');
       }
 
       // Try to get camera permission
-      console.log('🔐 Requesting camera permission...');
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately
-      console.log('✅ Camera permission granted');
       setHasPermission(true);
     } catch (err: any) {
-      console.error('❌ Camera permission error:', err);
       const errorMessage = err?.message || 'Camera permission is required to scan QR codes';
       setError(errorMessage);
       setHasPermission(false);
@@ -138,9 +114,6 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
     try {
       setIsScanning(true);
       setError(null);
-      
-      console.log('🚀 Starting native barcode scan...');
-      console.log('📱 CapacitorBarcodeScanner object:', CapacitorBarcodeScanner);
       
       if (!CapacitorBarcodeScanner) {
         throw new Error('CapacitorBarcodeScanner object is undefined');
@@ -167,14 +140,11 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
         }
       });
       
-      console.log('📱 Scan result:', result);
-      
       if (result && result.ScanResult) {
         onScan(result.ScanResult);
         onClose();
       }
     } catch (err: any) {
-      console.error('Native QR Scanner error:', err);
       const message = err?.message || err?.toString() || 'Unknown error';
       
       // Provide more specific error messages
@@ -266,7 +236,6 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
     try {
       if (isNative) {
         // For native apps, the new scanner handles its own cleanup automatically
-        console.log('🛑 Native scanner cleanup handled automatically');
       } else {
         // For web scanners
         if (qrScannerRef.current) {
@@ -277,7 +246,7 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
       }
       setIsScanning(false);
     } catch (err) {
-      console.error('Error stopping scanner:', err);
+      // Silent error handling for production
     }
   };
 
@@ -393,14 +362,6 @@ const QRScanner = ({ isOpen, onClose, onScan }: QRScannerProps) => {
             </Button>
           </div>
 
-          {/* Debug Information */}
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p><strong>Platform:</strong> {isNative ? 'Native (APK)' : 'Web'}</p>
-            <p><strong>Scanner Ready:</strong> {scannerReady ? 'Yes' : 'No'}</p>
-            <p><strong>Permission:</strong> {hasPermission === null ? 'Checking...' : hasPermission ? 'Granted' : 'Denied'}</p>
-            <p><strong>Initializing:</strong> {isInitializing ? 'Yes' : 'No'}</p>
-            {error && <p className="text-destructive"><strong>Error:</strong> {error}</p>}
-          </div>
 
           <div className="text-xs text-muted-foreground text-center">
             <p>
