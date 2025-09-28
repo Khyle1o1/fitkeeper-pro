@@ -18,6 +18,7 @@ import Reports from "./pages/Reports";
 import AttendanceReport from "./pages/AttendanceReport";
 import MembershipReport from "./pages/MembershipReport";
 import MemberActivityReport from "./pages/MemberActivityReport";
+import UserManagement from "./pages/UserManagement";
 
 const queryClient = new QueryClient();
 
@@ -38,8 +39,14 @@ const App = () => {
     setIsAuthenticated(true);
   };
 
+  const handleSignup = () => {
+    // After successful signup, redirect to login
+    // The user will need to sign in with their new credentials
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("fk:isAuthenticated");
+    localStorage.removeItem("fk:currentUser");
     setIsAuthenticated(false);
   };
 
@@ -54,7 +61,7 @@ const App = () => {
               <>
                 <Route 
                   path="/auth/*" 
-                  element={<AuthLayout onLogin={handleLogin} />} 
+                  element={<AuthLayout onLogin={handleLogin} onSignup={handleSignup} />} 
                 />
                 <Route path="*" element={<Navigate to="/auth/login" replace />} />
               </>
@@ -70,6 +77,7 @@ const App = () => {
                   <Route path="reports/attendance" element={<AttendanceReport />} />
                   <Route path="reports/membership" element={<MembershipReport />} />
                   <Route path="reports/member-activity" element={<MemberActivityReport />} />
+                  <Route path="users" element={<UserManagement />} />
                 </Route>
                 <Route path="/auth/*" element={<Navigate to="/" replace />} />
               </>

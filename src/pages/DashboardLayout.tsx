@@ -6,7 +6,8 @@ import {
   BarChart3, 
   LogOut,
   Menu,
-  X
+  X,
+  UserCog
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -26,6 +27,7 @@ const DashboardLayout = ({ onLogout }: DashboardLayoutProps) => {
     { name: 'Members', href: '/members', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'User Management', href: '/users', icon: UserCog },
   ];
 
   const isActiveRoute = (href: string) => {

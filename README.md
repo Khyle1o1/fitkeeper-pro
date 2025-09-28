@@ -1,8 +1,32 @@
-# Welcome to your Lovable project
+# FitKeeper Pro - Gym Management System
+
+A comprehensive gym management system built with React, TypeScript, and modern web technologies.
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/1116fc44-429b-485d-bd67-f7621b2cefdf
+
+## Authentication System
+
+The application now features a complete user management system:
+
+### Default Admin Account
+- **Username**: `admin`
+- **Password**: `Admin@123`
+- **Role**: Admin (full access)
+
+### User Management Features
+- Create new user accounts with different roles (Admin/Staff)
+- Secure password hashing using SHA-256
+- User account activation/deactivation
+- Role-based access control
+- Account creation through signup page
+
+### Getting Started
+1. Use the default admin credentials to log in
+2. Navigate to "User Management" to create additional accounts
+3. Create staff accounts for other users
+4. All users can be managed through the User Management interface
 
 ## How can I edit this code?
 

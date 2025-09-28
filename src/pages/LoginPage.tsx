@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Dumbbell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getUserByUsername, updateUser } from '@/lib/db';
+import { verifyPassword } from '@/lib/auth';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -27,7 +29,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
     'At least one lowercase letter',
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (isLocked) {
@@ -39,31 +41,87 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
       return;
     }
 
-    // Mock authentication - check for demo credentials
-    if (username === 'admin' && password === 'Admin@123') {
-      toast({
-        title: "Login Successful",
-        description: "Welcome to Gym Management System!",
-      });
-      onLogin();
-    } else {
-      const newFailedAttempts = failedAttempts + 1;
-      setFailedAttempts(newFailedAttempts);
+    try {
+      // Get user from database
+      const user = await getUserByUsername(username);
       
-      if (newFailedAttempts >= 5) {
-        setIsLocked(true);
-        toast({
-          title: "Account Locked",
-          description: "Too many failed attempts. Your account has been locked. Please reset your password.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Login Failed",
-          description: `Invalid credentials. ${5 - newFailedAttempts} attempts remaining.`,
-          variant: "destructive",
-        });
+      if (!user) {
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
+        
+        if (newFailedAttempts >= 5) {
+          setIsLocked(true);
+          toast({
+            title: "Account Locked",
+            description: "Too many failed attempts. Your account has been locked. Please reset your password.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Login Failed",
+            description: `Invalid credentials. ${5 - newFailedAttempts} attempts remaining.`,
+            variant: "destructive",
+          });
+        }
+        return;
       }
+
+      // Check if user is active
+      if (!user.isActive) {
+        toast({
+          title: "Account Disabled",
+          description: "Your account has been disabled. Please contact an administrator.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Verify password
+      const isValidPassword = await verifyPassword(password, user.passwordHash);
+      
+      if (isValidPassword) {
+        // Update last login time
+        await updateUser(user.id, { lastLoginAt: new Date().toISOString() });
+        
+        // Store user info in localStorage
+        localStorage.setItem("fk:currentUser", JSON.stringify({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role
+        }));
+        
+        toast({
+          title: "Login Successful",
+          description: `Welcome back, ${user.username}!`,
+        });
+        onLogin();
+      } else {
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
+        
+        if (newFailedAttempts >= 5) {
+          setIsLocked(true);
+          toast({
+            title: "Account Locked",
+            description: "Too many failed attempts. Your account has been locked. Please reset your password.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Login Failed",
+            description: `Invalid credentials. ${5 - newFailedAttempts} attempts remaining.`,
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Failed",
+        description: "An error occurred during login. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -152,19 +210,24 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
           </Button>
         </form>
 
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <Link 
             to="/auth/forgot-password" 
             className="text-sm text-primary hover:underline"
           >
             Forgot your password?
           </Link>
-        </div>
-
-        <div className="text-center text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-          <p className="font-medium mb-1">Demo Credentials:</p>
-          <p>Username: <code className="bg-background px-1 rounded">admin</code></p>
-          <p>Password: <code className="bg-background px-1 rounded">Admin@123</code></p>
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link 
+                to="/auth/signup" 
+                className="text-primary hover:underline"
+              >
+                Create one here
+              </Link>
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>

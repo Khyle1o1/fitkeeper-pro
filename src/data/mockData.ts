@@ -34,9 +34,25 @@ export interface RenewalRecord {
   fee: number;
 }
 
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  role: 'admin' | 'staff';
+  isActive: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
 // Generate member ID helper
 export const generateMemberId = (): string => {
   return `GM${Date.now().toString().slice(-6)}`;
+};
+
+// Generate user ID helper
+export const generateUserId = (): string => {
+  return `USER${Date.now().toString().slice(-6)}`;
 };
 
 // Calculate expiry date based on duration in months (defaults to 1 month)

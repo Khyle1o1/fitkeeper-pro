@@ -3,20 +3,23 @@ import {
   type Member,
   type AttendanceRecord,
   type RenewalRecord,
+  type User,
 } from "@/data/mockData";
 
 export class PowerLiftDatabase extends Dexie {
   members!: Table<Member, string>;
   attendance!: Table<AttendanceRecord, string>;
   renewals!: Table<RenewalRecord, string>;
+  users!: Table<User, string>;
 
   constructor() {
     super("powerlift-fitness-db");
-    // v4: add checkOutTime to attendance schema
-    this.version(4).stores({
+    // v5: add users table
+    this.version(5).stores({
       members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths",
       attendance: "id, memberId, memberName, date, checkInTime, checkOutTime",
       renewals: "id, memberId, renewalDate",
+      users: "id, username, email, role, isActive, createdAt",
     });
   }
 }
@@ -24,14 +27,16 @@ export class PowerLiftDatabase extends Dexie {
 export const db = new PowerLiftDatabase();
 
 export async function clearAllData(): Promise<void> {
-  await db.transaction("rw", [db.members, db.attendance, db.renewals], async () => {
+  await db.transaction("rw", [db.members, db.attendance, db.renewals, db.users], async () => {
     await db.members.clear();
     await db.attendance.clear();
     await db.renewals.clear();
+    await db.users.clear();
   });
   
-  // Clear the seeded flag so it won't auto-seed again
+  // Clear the seeded flags so it won't auto-seed again
   localStorage.removeItem("powerlift-db-seeded-v1");
+  localStorage.removeItem("powerlift-admin-seeded-v1");
 }
 
 export async function resetDatabase(): Promise<void> {
@@ -138,9 +143,35 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
   localStorage.setItem(seededKey, "true");
 }
 
+export async function seedDefaultAdminIfNeeded(): Promise<void> {
+  const adminSeededKey = "powerlift-admin-seeded-v1";
+  if (localStorage.getItem(adminSeededKey)) return;
+
+  const userCount = await db.users.count();
+  if (userCount > 0) return;
+
+  // Create a default admin user
+  const { hashPassword } = await import('./auth');
+  const passwordHash = await hashPassword('Admin@123');
+  
+  const defaultAdmin = {
+    id: 'USER000001',
+    username: 'admin',
+    email: 'admin@gym.com',
+    passwordHash,
+    role: 'admin' as const,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  await db.users.add(defaultAdmin);
+  localStorage.setItem(adminSeededKey, "true");
+}
+
 export async function initLocalDb(): Promise<void> {
   await db.open();
   await seedDatabaseIfEmpty();
+  await seedDefaultAdminIfNeeded();
 }
 
 // Simple query helpers for future use
@@ -148,5 +179,19 @@ export const getAllMembers = () => db.members.toArray();
 export const getAttendanceByDate = (date: string) =>
   db.attendance.where("date").equals(date).toArray();
 export const getRenewals = () => db.renewals.toArray();
+
+// User management functions
+export const getAllUsers = () => db.users.toArray();
+export const getUserByUsername = (username: string) => 
+  db.users.where("username").equals(username).first();
+export const getUserByEmail = (email: string) => 
+  db.users.where("email").equals(email).first();
+export const createUser = (user: Omit<User, 'id'>) => {
+  const id = `USER${Date.now().toString().slice(-6)}`;
+  return db.users.add({ ...user, id });
+};
+export const updateUser = (id: string, updates: Partial<User>) => 
+  db.users.update(id, updates);
+export const deleteUser = (id: string) => db.users.delete(id);
 
 
