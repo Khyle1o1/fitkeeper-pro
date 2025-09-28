@@ -427,7 +427,12 @@ const AddMember = () => {
       </Card>
 
       {/* Success Modal */}
-      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+      <Dialog open={showSuccess} onOpenChange={(open) => {
+        if (!open) {
+          setShowSuccess(false);
+          navigate('/members');
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Created</DialogTitle>
