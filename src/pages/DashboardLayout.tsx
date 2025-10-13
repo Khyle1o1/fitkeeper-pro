@@ -28,6 +28,7 @@ const DashboardLayout = ({ onLogout }: DashboardLayoutProps) => {
     { name: 'Members', href: '/members', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Settings', href: '/settings', icon: UserCog },
     { name: 'User Management', href: '/users', icon: UserCog },
   ];
 

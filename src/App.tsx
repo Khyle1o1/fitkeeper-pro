@@ -19,6 +19,7 @@ import AttendanceReport from "./pages/AttendanceReport";
 import MembershipReport from "./pages/MembershipReport";
 import MemberActivityReport from "./pages/MemberActivityReport";
 import UserManagement from "./pages/UserManagement";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => {
                   <Route path="reports/membership" element={<MembershipReport />} />
                   <Route path="reports/member-activity" element={<MemberActivityReport />} />
                   <Route path="users" element={<UserManagement />} />
+                  <Route path="settings" element={<Settings />} />
                 </Route>
                 <Route path="/auth/*" element={<Navigate to="/" replace />} />
               </>

@@ -4,6 +4,7 @@ import {
   type AttendanceRecord,
   type RenewalRecord,
   type User,
+  type WalkInPricingSettings,
 } from "@/data/mockData";
 
 export class PowerLiftDatabase extends Dexie {
@@ -11,15 +12,17 @@ export class PowerLiftDatabase extends Dexie {
   attendance!: Table<AttendanceRecord, string>;
   renewals!: Table<RenewalRecord, string>;
   users!: Table<User, string>;
+  settings!: Table<WalkInPricingSettings & { id: string }, string>;
 
   constructor() {
     super("powerlift-fitness-db");
-    // v5: add users table
-    this.version(5).stores({
+    // v6: add settings table and extend attendance fields
+    this.version(6).stores({
       members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths",
-      attendance: "id, memberId, memberName, date, checkInTime, checkOutTime",
+      attendance: "id, memberId, memberName, date, checkInTime, checkOutTime, is_walk_in, session_type, payment_method, price",
       renewals: "id, memberId, renewalDate",
       users: "id, username, email, role, isActive, createdAt",
+      settings: "id",
     });
   }
 }
@@ -140,6 +143,14 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
   ];
 
   await db.members.bulkAdd(seedMembers as any);
+
+  // Seed default walk-in pricing settings
+  await db.settings.add({
+    id: 'walkin_pricing',
+    oneHour: 80,
+    twoHours: 120,
+    wholeDay: 200,
+  });
   localStorage.setItem(seededKey, "true");
 }
 
@@ -179,6 +190,13 @@ export const getAllMembers = () => db.members.toArray();
 export const getAttendanceByDate = (date: string) =>
   db.attendance.where("date").equals(date).toArray();
 export const getRenewals = () => db.renewals.toArray();
+export const getWalkInPricing = async (): Promise<WalkInPricingSettings> => {
+  const rec = await db.settings.get('walkin_pricing');
+  return rec ? { oneHour: rec.oneHour, twoHours: rec.twoHours, wholeDay: rec.wholeDay } : { oneHour: 0, twoHours: 0, wholeDay: 0 };
+};
+export const setWalkInPricing = async (pricing: WalkInPricingSettings): Promise<void> => {
+  await db.settings.put({ id: 'walkin_pricing', ...pricing });
+};
 
 // User management functions
 export const getAllUsers = () => db.users.toArray();

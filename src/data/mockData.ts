@@ -17,11 +17,23 @@ export interface Member {
 
 export interface AttendanceRecord {
   id: string;
-  memberId: string;
-  memberName: string;
+  memberId: string; // For walk-ins, use 'WALKIN' or empty string
+  memberName: string; // For walk-ins, use entered name or 'Walk-In'
   checkInTime: string;
   checkOutTime?: string;
   date: string;
+  // Walk-in specific fields
+  is_walk_in?: boolean;
+  walkInName?: string; // duplicate of memberName when walk-in
+  session_type?: '1_hour' | '2_hours' | 'whole_day';
+  payment_method?: 'Cash' | 'GCash' | 'Card';
+  price?: number;
+}
+
+export interface WalkInPricingSettings {
+  oneHour: number;
+  twoHours: number;
+  wholeDay: number;
 }
 
 export interface RenewalRecord {

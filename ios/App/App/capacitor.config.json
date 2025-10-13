@@ -1,0 +1,16 @@
+{
+	"appId": "com.powerlift.fitness",
+	"appName": "PowerLift Fitness Gym",
+	"webDir": "dist",
+	"plugins": {
+		"BarcodeScanner": {
+			"cameraPermission": true,
+			"microphonePermission": false
+		}
+	},
+	"packageClassList": [
+		"CapacitorBarcodeScannerPlugin",
+		"FilesystemPlugin",
+		"SharePlugin"
+	]
+}

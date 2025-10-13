@@ -11,6 +11,8 @@ const Reports = () => {
     activeMembers: 0,
     expiringMembers: 0,
     retentionRate: 0,
+    walkInIncome: 0,
+    memberIncome: 0,
   });
 
   useEffect(() => {
@@ -23,6 +25,11 @@ const Reports = () => {
       const monthlyCheckIns = allAttendance.filter(record => 
         record.date.startsWith(currentMonth)
       ).length;
+      // Income breakdown (walk-ins only have price recorded)
+      const walkIns = allAttendance.filter((r: any) => r.is_walk_in === true);
+      const walkInIncome = walkIns.reduce((sum: number, r: any) => sum + (Number(r.price) || 0), 0);
+      // Member income is not derived from attendance; keep 0 unless renewal/payment tracking exists
+      const memberIncome = 0;
       
       // Get active members (IndexedDB cannot index boolean keys reliably; query by string index then filter)
       const activeMembers = (await db.members.where('status').equals('active').toArray())
@@ -46,6 +53,8 @@ const Reports = () => {
         activeMembers: activeMembers.length,
         expiringMembers: expiring.length,
         retentionRate,
+        walkInIncome,
+        memberIncome,
       });
     };
     

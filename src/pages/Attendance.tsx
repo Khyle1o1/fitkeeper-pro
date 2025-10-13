@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { QrCode, UserCheck, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db, initLocalDb } from '@/lib/db';
+import { db, initLocalDb, getWalkInPricing } from '@/lib/db';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QRScanner from '@/components/QRScanner';
 import {
   AlertDialog,
@@ -29,6 +30,12 @@ const Attendance = () => {
   const [memberForAction, setMemberForAction] = useState<any>(null);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
 
+  // Walk-in state
+  const [walkInName, setWalkInName] = useState('');
+  const [sessionType, setSessionType] = useState<'1_hour' | '2_hours' | 'whole_day'>('1_hour');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash' | 'Card'>('Cash');
+  const [pricing, setPricing] = useState<{ oneHour: number; twoHours: number; wholeDay: number }>({ oneHour: 0, twoHours: 0, wholeDay: 0 });
+
   const refreshTodayAttendance = async () => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
@@ -41,6 +48,8 @@ const Attendance = () => {
   useEffect(() => {
     (async () => {
       await initLocalDb();
+      const p = await getWalkInPricing();
+      setPricing(p);
       refreshTodayAttendance();
     })();
   }, []);
@@ -224,6 +233,85 @@ const Attendance = () => {
           </CardContent>
         </Card>
 
+        {/* Walk-In Check-in */}
+        <Card className="border-0 shadow-md">
+          <CardHeader>
+            <CardTitle>Walk-In Check-in</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="walkInName">Walk-In Name (optional)</Label>
+              <Input id="walkInName" placeholder="e.g., Juan D." value={walkInName} onChange={(e) => setWalkInName(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Session Type</Label>
+                <Select value={sessionType} onValueChange={(v: any) => setSessionType(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select session" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1_hour">1 Hour {pricing.oneHour ? `(₱${pricing.oneHour})` : ''}</SelectItem>
+                    <SelectItem value="2_hours">2 Hours {pricing.twoHours ? `(₱${pricing.twoHours})` : ''}</SelectItem>
+                    <SelectItem value="whole_day">Whole Day {pricing.wholeDay ? `(₱${pricing.wholeDay})` : ''}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="GCash">GCash</SelectItem>
+                    <SelectItem value="Card">Card</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Total: <span className="font-semibold text-foreground">
+                  {sessionType === '1_hour' ? `₱${pricing.oneHour}` : sessionType === '2_hours' ? `₱${pricing.twoHours}` : `₱${pricing.wholeDay}`}
+                </span>
+              </div>
+              <Button
+                className="bg-gradient-primary hover:opacity-90"
+                onClick={async () => {
+                  const now = new Date();
+                  const checkInTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
+                  const dateStr = now.toISOString().split('T')[0];
+                  const price = sessionType === '1_hour' ? pricing.oneHour : sessionType === '2_hours' ? pricing.twoHours : pricing.wholeDay;
+                  await db.attendance.add({
+                    id: `${Date.now()}`,
+                    memberId: 'WALKIN',
+                    memberName: walkInName || 'Walk-In',
+                    date: dateStr,
+                    checkInTime,
+                    is_walk_in: true,
+                    walkInName: walkInName || 'Walk-In',
+                    session_type: sessionType,
+                    payment_method: paymentMethod,
+                    price,
+                  } as any);
+                  setWalkInName('');
+                  setSessionType('1_hour');
+                  setPaymentMethod('Cash');
+                  toast({ title: 'Walk-In Recorded', description: `Recorded ${walkInName || 'Walk-In'} • ${sessionType.replace('_', ' ')} • ₱${price}` });
+                  refreshTodayAttendance();
+                }}
+              >
+                Record Walk-In
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Today's Attendance */}
         <Card className="border-0 shadow-md">
           <CardHeader>
@@ -234,12 +322,16 @@ const Attendance = () => {
               {todayAttendance.map((record) => (
                 <div key={record.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
-                    <p className="font-medium">{record.memberName}</p>
-                    <p className="text-sm text-muted-foreground">ID: {record.memberId}</p>
+                    <p className="font-medium">
+                      {record.memberName} {record.is_walk_in ? <span className="text-xs text-muted-foreground">(Walk-In)</span> : null}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {record.is_walk_in ? `${record.session_type?.replace('_', ' ')} • ${record.payment_method} • ₱${record.price}` : `ID: ${record.memberId}`}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-medium">{record.checkInTime}{record.checkOutTime ? ` • ${record.checkOutTime}` : ''}</p>
-                    <Badge variant="outline" className="text-xs">Active</Badge>
+                    <Badge variant="outline" className="text-xs">{record.is_walk_in ? 'Walk-In' : 'Active'}</Badge>
                   </div>
                 </div>
               ))}
