@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Archive } from 'lucide-react';
-import { getMembershipStatus, type Member as MemberType } from '@/data/mockData';
+import { Plus, Search, Archive } from 'lucide-react';
+import { getMembershipStatus } from '@/data/mockData';
 import { Member } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { db, initLocalDb } from '@/lib/db';
+import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { generateBarcodeDataUrl, generateQrCodeDataUrl } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -21,13 +22,16 @@ const Members = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
   const [barcodePreview, setBarcodePreview] = useState<string | null>(null);
-  const [tabsValue, setTabsValue] = useState<'active' | 'expired' | 'archived'>('active');
+  const [tabsValue, setTabsValue] = useState<'monthly' | 'per_session' | 'archived'>('monthly');
   const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
   const [renewMember, setRenewMember] = useState<Member | null>(null);
   const [renewMonths, setRenewMonths] = useState<number>(1);
   const [renewStep, setRenewStep] = useState<'select' | 'confirm'>('select');
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [archiveMember, setArchiveMember] = useState<Member | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteMemberState, setDeleteMemberState] = useState<Member | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash' | 'Card'>('Cash');
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -191,25 +195,25 @@ const Members = () => {
         </CardContent>
       </Card>
 
-      {/* Members List with Tabs */}
+      {/* Members List with Subscription Tabs */}
       <Tabs value={tabsValue} onValueChange={(v) => setTabsValue(v as any)}>
         <TabsList>
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="expired">Expired</TabsTrigger>
-          <TabsTrigger value="archived">Archived</TabsTrigger>
+          <TabsTrigger value="monthly">🟢 Monthly Subscribers</TabsTrigger>
+          <TabsTrigger value="per_session">🟡 Per Session Members</TabsTrigger>
+          <TabsTrigger value="archived">⚫ Archived Members</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active">
+        <TabsContent value="monthly">
           <Card className="border-0 shadow-md">
             <CardHeader>
               <CardTitle>
-                Active Members ({filteredMembers.filter(m => m.status === 'active' && m.isActive).length})
+                Monthly Subscribers
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredMembers.filter(m => m.status === 'active' && m.isActive).length > 0 ? (
-                  filteredMembers.filter(m => m.status === 'active' && m.isActive).map((member) => (
+                {members.filter(m => m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()).length > 0 ? (
+                  members.filter(m => m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()).map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
@@ -227,27 +231,21 @@ const Members = () => {
                           </div>
                           <div className="hidden lg:block">
                             <p className="text-sm">Start: {member.membershipStartDate}</p>
-                            <p className="text-sm text-muted-foreground">Expires: {member.membershipExpiryDate}</p>
+                            <p className="text-sm text-muted-foreground">Subscription Expires: {member.subscriptionExpiryDate}</p>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {getStatusBadge(member.status)}
+                        <Badge className="bg-green-100 text-green-700 border-green-200">🟢 Active</Badge>
                         <div className="flex gap-2">
-                          {member.isActive && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setArchiveMember(member);
-                                setIsArchiveDialogOpen(true);
-                              }}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Archive className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); /* cancel -> per session */ db.members.update(member.id, { paymentType: 'per_session', subscriptionExpiryDate: '' } as any).then(() => setMembers(prev => prev.map(x => x.id === member.id ? { ...x, paymentType: 'per_session', subscriptionExpiryDate: '' } : x))); }}
+                            className="text-orange-700 border-orange-200 hover:bg-orange-50"
+                          >
+                            Cancel Subscription
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -262,17 +260,15 @@ const Members = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="expired">
+        <TabsContent value="per_session">
           <Card className="border-0 shadow-md">
             <CardHeader>
-              <CardTitle>
-                Expired ({filteredMembers.filter(m => m.status === 'expired' && m.isActive).length})
-              </CardTitle>
+              <CardTitle>Per Session Members</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredMembers.filter(m => m.status === 'expired' && m.isActive).length > 0 ? (
-                  filteredMembers.filter(m => m.status === 'expired' && m.isActive).map((member) => (
+                {members.filter(m => !(m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()) && (m.status !== 'archived')).length > 0 ? (
+                  members.filter(m => !(m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()) && (m.status !== 'archived')).map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
@@ -290,20 +286,28 @@ const Members = () => {
                           </div>
                           <div className="hidden lg:block">
                             <p className="text-sm">Start: {member.membershipStartDate}</p>
-                            <p className="text-sm text-muted-foreground">Expires: {member.membershipExpiryDate}</p>
+                            <p className="text-sm text-muted-foreground">Last Subscription Expiry: {member.subscriptionExpiryDate || '-'}</p>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {getStatusBadge(member.status)}
+                        <Badge className="bg-orange-100 text-orange-700 border-orange-200">🔴 Expired</Badge>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); setRenewMember(member); setRenewMonths(1); setRenewStep('select'); setIsRenewDialogOpen(true); }}
+                            onClick={(e) => { e.stopPropagation(); setRenewMember(member); setRenewMonths(1); setRenewStep('confirm'); setIsRenewDialogOpen(true); }}
                             className="text-green-700 border-green-200 hover:bg-green-50"
                           >
-                            Renew
+                            Subscribe to Monthly
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); setArchiveMember(member); setIsArchiveDialogOpen(true); }}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            Archive
                           </Button>
                         </div>
                       </div>
@@ -322,9 +326,7 @@ const Members = () => {
         <TabsContent value="archived">
           <Card className="border-0 shadow-md">
             <CardHeader>
-              <CardTitle>
-                Archived ({filteredMembers.filter(m => m.status === 'archived' || !m.isActive).length})
-              </CardTitle>
+              <CardTitle>Archived</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -361,6 +363,14 @@ const Members = () => {
                             className="text-green-700 border-green-200 hover:bg-green-50"
                           >
                             Renew
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); setDeleteMemberState(member); setIsDeleteDialogOpen(true); }}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            Delete
                           </Button>
                         </div>
                       </div>
@@ -447,6 +457,51 @@ const Members = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsDeleteDialogOpen(false);
+            setDeleteMemberState(null);
+          } else {
+            setIsDeleteDialogOpen(true);
+          }
+        }}
+      >
+        <DialogContent>
+          {deleteMemberState && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">Delete Member</DialogTitle>
+                <DialogDescription>
+                  This will permanently delete {deleteMemberState.fullName} and their records from the local database. This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    const m = deleteMemberState;
+                    await db.members.delete(m.id);
+                    setMembers(prev => prev.filter(x => x.id !== m.id));
+                    setIsDeleteDialogOpen(false);
+                    setDeleteMemberState(null);
+                    toast({ title: 'Member Deleted', description: `${m.fullName} has been deleted permanently.` });
+                  }}
+                >
+                  Delete Permanently
+                </Button>
               </div>
             </div>
           )}

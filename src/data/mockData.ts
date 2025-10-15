@@ -15,6 +15,10 @@ export interface Member {
   isActive: boolean;
   // Indicates if the one-time membership fee has been paid
   membershipFeePaid?: boolean;
+  // Payment type selection
+  paymentType?: 'monthly' | 'per_session';
+  // For monthly subscriptions, track subscription expiry separately if needed
+  subscriptionExpiryDate?: string;
 }
 
 export interface AttendanceRecord {
@@ -40,8 +44,10 @@ export interface WalkInPricingSettings {
 
 // Global pricing settings
 export interface AppPricingSettings {
-  membershipFee: number; // default ₱200
-  walkInDailyRate?: number; // optional single daily rate if used
+  membershipFee: number; // default ₱200 (one-time lifetime)
+  monthlySubscriptionFee?: number; // default ₱500
+  perSessionMemberFee?: number; // default ₱80
+  perSessionWalkInFee?: number; // default ₱100
 }
 
 // Payments / Income Records
@@ -50,7 +56,7 @@ export interface PaymentRecord {
   date: string; // YYYY-MM-DD
   amount: number;
   method?: 'Cash' | 'GCash' | 'Card';
-  category: 'Membership Fee' | 'Walk-In Daily Fee' | 'Other';
+  category: 'Membership Fee' | 'Monthly Subscription' | 'Member Session Fee' | 'Walk-In Session Fee' | 'Other';
   description?: string;
   memberId?: string; // member id or WALKIN:<name>
 }

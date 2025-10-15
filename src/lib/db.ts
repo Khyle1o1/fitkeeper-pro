@@ -19,8 +19,8 @@ export class PowerLiftDatabase extends Dexie {
 
   constructor() {
     super("powerlift-fitness-db");
-    // v7: add payments table and extend settings
-    this.version(7).stores({
+    // v8: extend settings with pricing fields and member fields
+    this.version(8).stores({
       members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths",
       attendance: "id, memberId, memberName, date, checkInTime, checkOutTime, is_walk_in, session_type, payment_method, price",
       renewals: "id, memberId, renewalDate",
@@ -159,7 +159,9 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
   await db.settings.put({
     id: 'app_pricing',
     membershipFee: 200,
-    walkInDailyRate: 0,
+    monthlySubscriptionFee: 500,
+    perSessionMemberFee: 80,
+    perSessionWalkInFee: 100,
   } as any);
   localStorage.setItem(seededKey, "true");
 }
@@ -208,10 +210,20 @@ export const setWalkInPricing = async (pricing: WalkInPricingSettings): Promise<
   await db.settings.put({ id: 'walkin_pricing', ...pricing });
 };
 
-// App pricing helpers (membership fee + optional walk-in daily rate)
+// App pricing helpers (membership fee + monthly + per-session fees)
 export const getAppPricing = async (): Promise<AppPricingSettings> => {
   const rec = await db.settings.get('app_pricing');
-  return rec ? { membershipFee: Number(rec.membershipFee) || 200, walkInDailyRate: Number(rec.walkInDailyRate) || 0 } : { membershipFee: 200, walkInDailyRate: 0 };
+  return rec ? {
+    membershipFee: Number(rec.membershipFee) || 200,
+    monthlySubscriptionFee: Number(rec.monthlySubscriptionFee) || 500,
+    perSessionMemberFee: Number(rec.perSessionMemberFee) || 80,
+    perSessionWalkInFee: Number(rec.perSessionWalkInFee) || 100,
+  } : {
+    membershipFee: 200,
+    monthlySubscriptionFee: 500,
+    perSessionMemberFee: 80,
+    perSessionWalkInFee: 100,
+  };
 };
 export const setAppPricing = async (pricing: AppPricingSettings): Promise<void> => {
   await db.settings.put({ id: 'app_pricing', ...pricing } as any);
