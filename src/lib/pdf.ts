@@ -120,6 +120,12 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
 export type PdfExportWithLogoOptions = PdfExportOptions & {
   logoUrl?: string; // e.g. '/logo.png'
   logoWidthPx?: number; // width in pixels at 72 DPI (pt); default 48
+  // Optional: tables to render BEFORE the main table (e.g., summaries)
+  prependTables?: Array<{
+    title?: string;
+    columns: PdfTableColumn[];
+    rows: Array<Record<string, unknown>>;
+  }>;
 };
 
 export function getCurrentTimestamp(timeZone?: string): string {
@@ -168,6 +174,37 @@ export async function exportTableToPdfWithLogo(options: PdfExportWithLogoOptions
     const split = doc.splitTextToSize(options.subtitle, 515);
     doc.text(split, marginLeft, cursorY);
     cursorY += (Array.isArray(split) ? split.length : 1) * 14 + 6;
+  }
+
+  // Optional prepended tables (e.g., income summary)
+  if (options.prependTables && options.prependTables.length > 0) {
+    for (const tbl of options.prependTables) {
+      if (tbl.title) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(tbl.title, marginLeft, cursorY);
+        cursorY += 16;
+      }
+      const pHead = [tbl.columns.map((c) => c.header)];
+      const pBody: RowInput[] = tbl.rows.map((row) =>
+        tbl.columns.map((c) => {
+          const value = row[c.dataKey];
+          if (value == null) return '';
+          if (value instanceof Date) return value.toLocaleString();
+          return String(value);
+        }),
+      );
+      autoTable(doc, {
+        head: pHead,
+        body: pBody,
+        startY: cursorY,
+        styles: { fontSize: 10, cellPadding: 6 },
+        headStyles: { fillColor: [30, 41, 59] },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        margin: { left: marginLeft, right: marginLeft },
+      });
+      cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 12;
+    }
   }
 
   const head = [options.columns.map((c) => c.header)];

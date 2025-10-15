@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Download, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportTableToPdfWithLogo, getCurrentTimestamp } from '@/lib/pdf';
-import { db, initLocalDb } from '@/lib/db';
+import { db, initLocalDb, getAllPayments } from '@/lib/db';
 import { useToast } from '@/hooks/use-toast';
 
 const AttendanceReport = () => {
@@ -23,6 +23,7 @@ const AttendanceReport = () => {
   const handleExportPDF = async () => {
     await initLocalDb();
     const allRecords = await db.attendance.toArray();
+    const payments = await getAllPayments();
     const rows = allRecords
       .filter((r) => r.date >= filters.startDate && r.date <= filters.endDate)
       .map((r) => ({
@@ -33,9 +34,31 @@ const AttendanceReport = () => {
         checkOutTime: r.checkOutTime || '',
       }));
 
+    // Income summary for the period
+    const incomeWindow = payments.filter((p) => (p.date || '') >= filters.startDate && (p.date || '') <= filters.endDate);
+    const membershipFees = incomeWindow.filter((p) => p.category === 'Membership Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const walkInIncome = incomeWindow.filter((p) => p.category === 'Walk-In Daily Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const otherIncome = incomeWindow.filter((p) => p.category === 'Other').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const totalIncome = membershipFees + walkInIncome + otherIncome;
+
     exportTableToPdfWithLogo({
       title: 'Attendance Report',
       subtitle: `Period: ${filters.startDate} to ${filters.endDate} • View: ${filters.period}`,
+      prependTables: [
+        {
+          title: 'Income Summary',
+          columns: [
+            { header: 'Category', dataKey: 'label' },
+            { header: 'Amount (₱)', dataKey: 'amount' },
+          ],
+          rows: [
+            { label: 'Membership Fees', amount: membershipFees },
+            { label: 'Walk-In Income', amount: walkInIncome },
+            { label: 'Other', amount: otherIncome },
+            { label: 'Total Income', amount: totalIncome },
+          ],
+        },
+      ],
       columns: [
         { header: 'Member', dataKey: 'memberName' },
         { header: 'Member ID', dataKey: 'memberId' },

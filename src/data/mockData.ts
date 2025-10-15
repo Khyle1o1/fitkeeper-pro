@@ -13,6 +13,8 @@ export interface Member {
   barcodeDataUrl?: string | null;
   status: 'active' | 'expired' | 'soon-to-expire' | 'archived';
   isActive: boolean;
+  // Indicates if the one-time membership fee has been paid
+  membershipFeePaid?: boolean;
 }
 
 export interface AttendanceRecord {
@@ -34,6 +36,23 @@ export interface WalkInPricingSettings {
   oneHour: number;
   twoHours: number;
   wholeDay: number;
+}
+
+// Global pricing settings
+export interface AppPricingSettings {
+  membershipFee: number; // default ₱200
+  walkInDailyRate?: number; // optional single daily rate if used
+}
+
+// Payments / Income Records
+export interface PaymentRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  method?: 'Cash' | 'GCash' | 'Card';
+  category: 'Membership Fee' | 'Walk-In Daily Fee' | 'Other';
+  description?: string;
+  memberId?: string; // member id or WALKIN:<name>
 }
 
 export interface RenewalRecord {

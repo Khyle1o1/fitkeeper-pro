@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 import { generateMemberId, calculateExpiryDate } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { db, initLocalDb } from '@/lib/db';
+import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
 import { generateQrCodeDataUrl } from '@/lib/utils';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import jsPDF from 'jspdf';
@@ -62,11 +62,24 @@ const AddMember = () => {
       qrCodeDataUrl: qrCode,
       status: 'active',
       isActive: true,
+      membershipFeePaid: true,
     } as any);
+
+    // Record membership fee payment
+    const appPricing = await getAppPricing();
+    const dateStr = new Date().toISOString().split('T')[0];
+    await addPayment({
+      date: dateStr,
+      amount: Number(appPricing.membershipFee) || 200,
+      method: 'Cash',
+      category: 'Membership Fee',
+      description: `Initial membership fee for ${formData.fullName} (${memberId})`,
+      memberId,
+    });
 
     toast({
       title: 'Member Added Successfully',
-      description: `${formData.fullName} has been added with ID: ${memberId}`,
+      description: `Membership successfully created. ₱${Number((await getAppPricing()).membershipFee) || 200} Membership Fee has been added.`,
     });
     setShowSuccess(true);
   };

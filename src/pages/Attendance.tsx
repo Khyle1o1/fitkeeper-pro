@@ -4,9 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from '@/components/ui/pagination';
 import { QrCode, UserCheck, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db, initLocalDb, getWalkInPricing } from '@/lib/db';
+import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QRScanner from '@/components/QRScanner';
 import {
@@ -24,17 +25,26 @@ const Attendance = () => {
   const [memberId, setMemberId] = useState('');
   const [checkedInMember, setCheckedInMember] = useState<any>(null);
   const [todayAttendance, setTodayAttendance] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmType, setConfirmType] = useState<'checkin' | 'checkout'>('checkin');
   const [memberForAction, setMemberForAction] = useState<any>(null);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
 
+  // Check-in type state (Member vs Walk-In)
+  const [checkInType, setCheckInType] = useState<'member' | 'walkin'>(() => {
+    const saved = localStorage.getItem('attendance_checkin_type');
+    return (saved === 'walkin' || saved === 'member') ? (saved as any) : 'member';
+  });
   // Walk-in state
   const [walkInName, setWalkInName] = useState('');
-  const [sessionType, setSessionType] = useState<'1_hour' | '2_hours' | 'whole_day'>('1_hour');
+  const [sessionType] = useState<'whole_day'>('whole_day');
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash' | 'Card'>('Cash');
-  const [pricing, setPricing] = useState<{ oneHour: number; twoHours: number; wholeDay: number }>({ oneHour: 0, twoHours: 0, wholeDay: 0 });
+  const [appPricing, setAppPricingState] = useState<{ membershipFee: number; walkInDailyRate?: number }>({ membershipFee: 200, walkInDailyRate: 0 });
+  const [isFirstVisit, setIsFirstVisit] = useState<boolean>(true);
+  const [walkInConfirmOpen, setWalkInConfirmOpen] = useState(false);
 
   const refreshTodayAttendance = async () => {
     const today = new Date();
@@ -43,16 +53,38 @@ const Attendance = () => {
     // Sort latest first by id (timestamp-based below)
     records.sort((a: any, b: any) => (b.id > a.id ? 1 : -1));
     setTodayAttendance(records);
+    // Reset page if needed
+    const pageCount = Math.max(1, Math.ceil(records.length / pageSize));
+    setCurrentPage(prev => Math.min(prev, pageCount));
   };
 
   useEffect(() => {
     (async () => {
       await initLocalDb();
-      const p = await getWalkInPricing();
-      setPricing(p);
+      const appP = await getAppPricing();
+      setAppPricingState(appP);
       refreshTodayAttendance();
     })();
   }, []);
+
+  useEffect(() => {
+    // Persist check-in type selection
+    localStorage.setItem('attendance_checkin_type', checkInType);
+  }, [checkInType]);
+
+  useEffect(() => {
+    // Determine if current walk-in name is a first-time visitor
+    (async () => {
+      const normalized = (walkInName || '').trim().toLowerCase();
+      if (!normalized) {
+        setIsFirstVisit(true);
+        return;
+      }
+      const allWalkins = await db.attendance.where('memberId').equals('WALKIN').toArray();
+      const prior = allWalkins.some((r: any) => (r.walkInName || '').trim().toLowerCase() === normalized);
+      setIsFirstVisit(!prior);
+    })();
+  }, [walkInName]);
 
   const openConfirm = (type: 'checkin' | 'checkout', member: any) => {
     setConfirmType(type);
@@ -162,8 +194,24 @@ const Attendance = () => {
         <p className="text-muted-foreground">Record member check-ins and view daily attendance</p>
       </div>
 
+      <div className="space-y-4">
+        <div>
+          <Label>Check-In Type</Label>
+          <Select value={checkInType} onValueChange={(v: any) => setCheckInType(v)}>
+            <SelectTrigger className="w-full mt-1">
+              <SelectValue placeholder="Select Check-In Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="walkin">Non-Member (Walk-In)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Check-in Form */}
+        {checkInType === 'member' && (
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -232,33 +280,28 @@ const Attendance = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
-        {/* Walk-In Check-in */}
+        {/* Walk-In Check-in */
+        }
+        {checkInType === 'walkin' && (
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle>Walk-In Check-in</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="walkInName">Walk-In Name (optional)</Label>
-              <Input id="walkInName" placeholder="e.g., Juan D." value={walkInName} onChange={(e) => setWalkInName(e.target.value)} />
+              <Label htmlFor="walkInName">Walk-In Name</Label>
+              <Input id="walkInName" required placeholder="e.g., Juan D." value={walkInName} onChange={(e) => setWalkInName(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Session Type</Label>
-                <Select value={sessionType} onValueChange={(v: any) => setSessionType(v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select session" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1_hour">1 Hour {pricing.oneHour ? `(₱${pricing.oneHour})` : ''}</SelectItem>
-                    <SelectItem value="2_hours">2 Hours {pricing.twoHours ? `(₱${pricing.twoHours})` : ''}</SelectItem>
-                    <SelectItem value="whole_day">Whole Day {pricing.wholeDay ? `(₱${pricing.wholeDay})` : ''}</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="w-full h-10 rounded-md border border-input bg-muted/40 px-3 flex items-center text-sm">
+                  Whole Day {appPricing.walkInDailyRate ? `(₱${appPricing.walkInDailyRate})` : ''}
+                </div>
               </div>
-
               <div className="space-y-2">
                 <Label>Payment Method</Label>
                 <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
@@ -274,36 +317,27 @@ const Attendance = () => {
               </div>
             </div>
 
+            <p className="text-xs text-muted-foreground">₱{appPricing.membershipFee || 200} Membership Fee will be added for first-time walk-ins.</p>
+
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Total: <span className="font-semibold text-foreground">
-                  {sessionType === '1_hour' ? `₱${pricing.oneHour}` : sessionType === '2_hours' ? `₱${pricing.twoHours}` : `₱${pricing.wholeDay}`}
+                  {(() => {
+                    const base = Number(appPricing.walkInDailyRate) || 0;
+                    const fee = isFirstVisit ? (Number(appPricing.membershipFee) || 200) : 0;
+                    return `₱${base + fee}`;
+                  })()}
                 </span>
               </div>
               <Button
                 className="bg-gradient-primary hover:opacity-90"
-                onClick={async () => {
-                  const now = new Date();
-                  const checkInTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
-                  const dateStr = now.toISOString().split('T')[0];
-                  const price = sessionType === '1_hour' ? pricing.oneHour : sessionType === '2_hours' ? pricing.twoHours : pricing.wholeDay;
-                  await db.attendance.add({
-                    id: `${Date.now()}`,
-                    memberId: 'WALKIN',
-                    memberName: walkInName || 'Walk-In',
-                    date: dateStr,
-                    checkInTime,
-                    is_walk_in: true,
-                    walkInName: walkInName || 'Walk-In',
-                    session_type: sessionType,
-                    payment_method: paymentMethod,
-                    price,
-                  } as any);
-                  setWalkInName('');
-                  setSessionType('1_hour');
-                  setPaymentMethod('Cash');
-                  toast({ title: 'Walk-In Recorded', description: `Recorded ${walkInName || 'Walk-In'} • ${sessionType.replace('_', ' ')} • ₱${price}` });
-                  refreshTodayAttendance();
+                disabled={!walkInName.trim()}
+                onClick={() => {
+                  if (!walkInName.trim()) {
+                    toast({ title: 'Name Required', description: 'Please enter the walk-in name before recording.', variant: 'destructive' });
+                    return;
+                  }
+                  setWalkInConfirmOpen(true);
                 }}
               >
                 Record Walk-In
@@ -311,6 +345,7 @@ const Attendance = () => {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Today's Attendance */}
         <Card className="border-0 shadow-md">
@@ -319,11 +354,16 @@ const Attendance = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {todayAttendance.map((record) => (
+              {(() => {
+                const pageCount = Math.max(1, Math.ceil(todayAttendance.length / pageSize));
+                const start = (currentPage - 1) * pageSize;
+                const visible = todayAttendance.slice(start, start + pageSize);
+                return visible;
+              })().map((record) => (
                 <div key={record.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
                     <p className="font-medium">
-                      {record.memberName} {record.is_walk_in ? <span className="text-xs text-muted-foreground">(Walk-In)</span> : null}
+                      {record.memberName} {record.is_walk_in ? <span className="text-xs text-muted-foreground">(Non-Member)</span> : null}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {record.is_walk_in ? `${record.session_type?.replace('_', ' ')} • ${record.payment_method} • ₱${record.price}` : `ID: ${record.memberId}`}
@@ -340,6 +380,27 @@ const Attendance = () => {
                 <p className="text-center text-muted-foreground py-8">No check-ins recorded today</p>
               )}
             </div>
+            {todayAttendance.length > pageSize && (
+              <div className="pt-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
+                    </PaginationItem>
+                    {Array.from({ length: Math.ceil(todayAttendance.length / pageSize) }, (_, i) => (
+                      <PaginationItem key={i}>
+                        <PaginationLink isActive={currentPage === i + 1} onClick={() => setCurrentPage(i + 1)}>
+                          {i + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext onClick={() => setCurrentPage(p => Math.min(Math.ceil(todayAttendance.length / pageSize), p + 1))} />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -398,6 +459,12 @@ const Attendance = () => {
                         {String(memberForAction.status).toUpperCase()}
                       </Badge>
                     </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium w-24">Membership Fee:</span>
+                      <Badge variant={memberForAction.membershipFeePaid ? 'outline' : 'destructive'} className={!memberForAction.membershipFeePaid ? 'text-destructive border-destructive/30' : ''}>
+                        {memberForAction.membershipFeePaid ? 'Paid' : 'Unpaid'}
+                      </Badge>
+                    </div>
                     {confirmType === 'checkout' && (
                       <div className="flex items-center gap-3">
                         <span className="font-medium w-24">Check-out:</span>
@@ -439,6 +506,81 @@ const Attendance = () => {
                 } else {
                   performCheckOut(memberForAction);
                 }
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Walk-In Confirmation Modal */}
+      <AlertDialog open={walkInConfirmOpen} onOpenChange={setWalkInConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Walk-In</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please review the walk-in details before recording.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{walkInName || 'Walk-In'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Session</span><span className="font-medium">Whole day</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{paymentMethod}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Daily Rate</span><span className="font-medium">₱{Number(appPricing.walkInDailyRate) || 0}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Membership Fee</span><span className="font-medium">{isFirstVisit ? `₱${Number(appPricing.membershipFee) || 200}` : '₱0'}</span></div>
+            <div className="flex justify-between border-t pt-2"><span className="text-muted-foreground">Total</span><span className="font-semibold">₱{(Number(appPricing.walkInDailyRate) || 0) + (isFirstVisit ? (Number(appPricing.membershipFee) || 200) : 0)}</span></div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const now = new Date();
+                const checkInTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
+                const dateStr = now.toISOString().split('T')[0];
+                const price = Number(appPricing.walkInDailyRate) || 0;
+                const allWalkins = await db.attendance.where('memberId').equals('WALKIN').toArray();
+                const normalizedName = (walkInName || '').trim().toLowerCase();
+                const hasPrior = normalizedName
+                  ? allWalkins.some((r: any) => (r.walkInName || '').trim().toLowerCase() === normalizedName)
+                  : allWalkins.length > 0 && false;
+                const firstVisitFee = hasPrior ? 0 : (Number(appPricing.membershipFee) || 200);
+                const total = price + firstVisitFee;
+                await db.attendance.add({
+                  id: `${Date.now()}`,
+                  memberId: 'WALKIN',
+                  memberName: walkInName || 'Walk-In',
+                  date: dateStr,
+                  checkInTime,
+                  is_walk_in: true,
+                  walkInName: walkInName || 'Walk-In',
+                  session_type: 'whole_day',
+                  payment_method: paymentMethod,
+                  price: total,
+                } as any);
+                await addPayment({
+                  date: dateStr,
+                  amount: price,
+                  method: paymentMethod,
+                  category: 'Walk-In Daily Fee',
+                  description: `Whole day walk-in for ${walkInName || 'Walk-In'}`,
+                  memberId: `WALKIN:${walkInName || 'Walk-In'}`,
+                });
+                if (firstVisitFee > 0) {
+                  await addPayment({
+                    date: dateStr,
+                    amount: firstVisitFee,
+                    method: paymentMethod,
+                    category: 'Membership Fee',
+                    description: `First visit membership fee for ${walkInName || 'Walk-In'}`,
+                    memberId: `WALKIN:${walkInName || 'Walk-In'}`,
+                  });
+                }
+                setWalkInConfirmOpen(false);
+                setWalkInName('');
+                setPaymentMethod('Cash');
+                toast({ title: 'Walk-In Recorded', description: `Recorded ${walkInName || 'Walk-In'} • Whole day • ₱${total}${firstVisitFee ? ` (includes ₱${firstVisitFee} membership fee)` : ''}` });
+                refreshTodayAttendance();
               }}
             >
               Confirm

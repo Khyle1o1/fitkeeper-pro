@@ -5,6 +5,8 @@ import {
   type RenewalRecord,
   type User,
   type WalkInPricingSettings,
+  type AppPricingSettings,
+  type PaymentRecord,
 } from "@/data/mockData";
 
 export class PowerLiftDatabase extends Dexie {
@@ -12,17 +14,19 @@ export class PowerLiftDatabase extends Dexie {
   attendance!: Table<AttendanceRecord, string>;
   renewals!: Table<RenewalRecord, string>;
   users!: Table<User, string>;
-  settings!: Table<WalkInPricingSettings & { id: string }, string>;
+  settings!: Table<(WalkInPricingSettings & AppPricingSettings & { id: string }), string>;
+  payments!: Table<PaymentRecord, string>;
 
   constructor() {
     super("powerlift-fitness-db");
-    // v6: add settings table and extend attendance fields
-    this.version(6).stores({
+    // v7: add payments table and extend settings
+    this.version(7).stores({
       members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths",
       attendance: "id, memberId, memberName, date, checkInTime, checkOutTime, is_walk_in, session_type, payment_method, price",
       renewals: "id, memberId, renewalDate",
       users: "id, username, email, role, isActive, createdAt",
       settings: "id",
+      payments: "id, date, category, amount, memberId",
     });
   }
 }
@@ -151,6 +155,12 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     twoHours: 120,
     wholeDay: 200,
   });
+  // Seed default app pricing
+  await db.settings.put({
+    id: 'app_pricing',
+    membershipFee: 200,
+    walkInDailyRate: 0,
+  } as any);
   localStorage.setItem(seededKey, "true");
 }
 
@@ -197,6 +207,27 @@ export const getWalkInPricing = async (): Promise<WalkInPricingSettings> => {
 export const setWalkInPricing = async (pricing: WalkInPricingSettings): Promise<void> => {
   await db.settings.put({ id: 'walkin_pricing', ...pricing });
 };
+
+// App pricing helpers (membership fee + optional walk-in daily rate)
+export const getAppPricing = async (): Promise<AppPricingSettings> => {
+  const rec = await db.settings.get('app_pricing');
+  return rec ? { membershipFee: Number(rec.membershipFee) || 200, walkInDailyRate: Number(rec.walkInDailyRate) || 0 } : { membershipFee: 200, walkInDailyRate: 0 };
+};
+export const setAppPricing = async (pricing: AppPricingSettings): Promise<void> => {
+  await db.settings.put({ id: 'app_pricing', ...pricing } as any);
+};
+
+// Payments helpers
+export const addPayment = async (payment: Omit<PaymentRecord, 'id'>): Promise<string> => {
+  const id = `${Date.now()}`;
+  await db.payments.add({ ...payment, id });
+  return id;
+};
+export const getPaymentsByMonth = async (ym: string): Promise<PaymentRecord[]> => {
+  const all = await db.payments.toArray();
+  return all.filter(p => (p.date || '').startsWith(ym));
+};
+export const getAllPayments = (): Promise<PaymentRecord[]> => db.payments.toArray();
 
 // User management functions
 export const getAllUsers = () => db.users.toArray();

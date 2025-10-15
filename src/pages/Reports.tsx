@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Users, UserCheck, ArrowRight } from 'lucide-react';
-import { db, initLocalDb } from '@/lib/db';
+import { db, initLocalDb, getAllPayments } from '@/lib/db';
 
 const Reports = () => {
   const [stats, setStats] = useState({
@@ -12,7 +12,8 @@ const Reports = () => {
     expiringMembers: 0,
     retentionRate: 0,
     walkInIncome: 0,
-    memberIncome: 0,
+    membershipFees: 0,
+    otherIncome: 0,
   });
 
   useEffect(() => {
@@ -25,11 +26,13 @@ const Reports = () => {
       const monthlyCheckIns = allAttendance.filter(record => 
         record.date.startsWith(currentMonth)
       ).length;
-      // Income breakdown (walk-ins only have price recorded)
-      const walkIns = allAttendance.filter((r: any) => r.is_walk_in === true);
-      const walkInIncome = walkIns.reduce((sum: number, r: any) => sum + (Number(r.price) || 0), 0);
-      // Member income is not derived from attendance; keep 0 unless renewal/payment tracking exists
-      const memberIncome = 0;
+      // Income breakdown using payments table
+      const ym = new Date().toISOString().slice(0, 7);
+      const payments = await getAllPayments();
+      const thisMonth = payments.filter(p => (p.date || '').startsWith(ym));
+      const membershipFees = thisMonth.filter(p => p.category === 'Membership Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const walkInIncome = thisMonth.filter(p => p.category === 'Walk-In Daily Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const otherIncome = thisMonth.filter(p => p.category === 'Other').reduce((s, p) => s + (Number(p.amount) || 0), 0);
       
       // Get active members (IndexedDB cannot index boolean keys reliably; query by string index then filter)
       const activeMembers = (await db.members.where('status').equals('active').toArray())
@@ -54,7 +57,8 @@ const Reports = () => {
         expiringMembers: expiring.length,
         retentionRate,
         walkInIncome,
-        memberIncome,
+        membershipFees,
+        otherIncome,
       });
     };
     
@@ -137,6 +141,20 @@ const Reports = () => {
             <div className="text-center">
               <p className="text-2xl font-bold text-accent">{stats.retentionRate}%</p>
               <p className="text-sm text-muted-foreground">Member Retention Rate</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold">₱{stats.membershipFees}</p>
+              <p className="text-sm text-muted-foreground">Membership Fees</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold">₱{stats.walkInIncome}</p>
+              <p className="text-sm text-muted-foreground">Walk-In Daily Income</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold">₱{stats.membershipFees + stats.walkInIncome + stats.otherIncome}</p>
+              <p className="text-sm text-muted-foreground">Total Income</p>
             </div>
           </div>
         </CardContent>
