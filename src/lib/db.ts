@@ -20,8 +20,9 @@ export class PowerLiftDatabase extends Dexie {
   constructor() {
     super("powerlift-fitness-db");
     // v9: add referral system fields (invite_code, referred_by, invite_count)
-    this.version(9).stores({
-      members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths, invite_code, referred_by",
+    // v10: add membershipDuration, sessionCount, lastSessionDate for refined membership tracking
+    this.version(10).stores({
+      members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDuration, paymentType, subscriptionExpiryDate, invite_code, referred_by",
       attendance: "id, memberId, memberName, date, checkInTime, checkOutTime, is_walk_in, session_type, payment_method, price",
       renewals: "id, memberId, renewalDate",
       users: "id, username, email, role, isActive, createdAt",

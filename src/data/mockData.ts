@@ -7,7 +7,9 @@ export interface Member {
   phone: string;
   membershipStartDate: string;
   membershipExpiryDate: string;
-  membershipDurationMonths?: number;
+  membershipDurationMonths?: number; // Legacy field (kept for compatibility)
+  // New: Membership duration (Lifetime, 1 Year, 2 Years, etc.) - separate from subscription
+  membershipDuration?: 'Lifetime' | '1 Year' | '2 Years' | '3 Years' | '4 Years' | '5 Years';
   photoDataUrl?: string | null;
   qrCodeDataUrl?: string | null;
   barcodeDataUrl?: string | null;
@@ -17,8 +19,11 @@ export interface Member {
   membershipFeePaid?: boolean;
   // Payment type selection
   paymentType?: 'monthly' | 'per_session';
-  // For monthly subscriptions, track subscription expiry separately if needed
+  // For monthly subscriptions, track subscription expiry separately from membership
   subscriptionExpiryDate?: string;
+  // For per-session members: track total sessions and last visit
+  sessionCount?: number;
+  lastSessionDate?: string;
   // Referral system fields
   invite_code?: string; // Auto-generated from member ID
   referred_by?: string | null; // Invite code of the member who referred this member

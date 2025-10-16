@@ -15,6 +15,54 @@ import { generateBarcodeDataUrl, generateQrCodeDataUrl } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+// Helper to determine member category and badge
+const getMemberCategory = (member: Member): { 
+  type: 'monthly_subscriber' | 'per_session' | 'member_only' | 'archived',
+  badge: { text: string; className: string; emoji: string }
+} => {
+  // Archived members
+  if (member.status === 'archived' || !member.isActive) {
+    return {
+      type: 'archived',
+      badge: { text: 'Archived', className: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300', emoji: '🟥' }
+    };
+  }
+
+  // Check if they have an active monthly subscription
+  const today = new Date();
+  const subExpiry = member.subscriptionExpiryDate ? new Date(member.subscriptionExpiryDate) : null;
+  const hasActiveSubscription = member.paymentType === 'monthly' && subExpiry && subExpiry >= today;
+
+  if (hasActiveSubscription) {
+    return {
+      type: 'monthly_subscriber',
+      badge: { text: 'Active Monthly', className: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900 dark:text-green-300', emoji: '🟩' }
+    };
+  }
+
+  // Check if they're registered but choosing per-session
+  if (member.membershipFeePaid && member.paymentType === 'per_session') {
+    return {
+      type: 'per_session',
+      badge: { text: 'Per Session', className: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300', emoji: '🟦' }
+    };
+  }
+
+  // Member with fee paid but no subscription yet
+  if (member.membershipFeePaid) {
+    return {
+      type: 'member_only',
+      badge: { text: 'Member Only', className: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900 dark:text-orange-300', emoji: '🟧' }
+    };
+  }
+
+  // Default to member only if they're active
+  return {
+    type: 'member_only',
+    badge: { text: 'Member', className: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900 dark:text-orange-300', emoji: '🟧' }
+  };
+};
+
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,7 +71,7 @@ const Members = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
   const [barcodePreview, setBarcodePreview] = useState<string | null>(null);
-  const [tabsValue, setTabsValue] = useState<'monthly' | 'per_session' | 'archived'>('monthly');
+  const [tabsValue, setTabsValue] = useState<'monthly' | 'per_session' | 'member_only' | 'archived'>('monthly');
   const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
   const [renewMember, setRenewMember] = useState<Member | null>(null);
   const [renewMonths, setRenewMonths] = useState<number>(1);
@@ -256,71 +304,93 @@ const Members = () => {
         </CardContent>
       </Card>
 
-      {/* Members List with Subscription Tabs */}
+      {/* Members List with Category Tabs */}
       <Tabs value={tabsValue} onValueChange={(v) => setTabsValue(v as any)}>
-        <TabsList>
-          <TabsTrigger value="monthly">🟢 Monthly Subscribers</TabsTrigger>
-          <TabsTrigger value="per_session">🟡 Per Session Members</TabsTrigger>
-          <TabsTrigger value="archived">⚫ Archived Members</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="monthly">🟩 Monthly Subscribers</TabsTrigger>
+          <TabsTrigger value="per_session">🟦 Per Session</TabsTrigger>
+          <TabsTrigger value="member_only">🟧 Member Only</TabsTrigger>
+          <TabsTrigger value="archived">🟥 Archived</TabsTrigger>
         </TabsList>
 
         <TabsContent value="monthly">
           <Card className="border-0 shadow-md">
             <CardHeader>
-              <CardTitle>
-                Monthly Subscribers
-              </CardTitle>
+              <CardTitle>🟩 Monthly Subscribers</CardTitle>
+              <p className="text-sm text-muted-foreground">Members with active monthly subscriptions</p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {(() => {
-                  const monthlyMembers = members.filter(m => m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date());
+                  const monthlyMembers = filteredMembers.filter(m => {
+                    const category = getMemberCategory(m);
+                    return category.type === 'monthly_subscriber';
+                  });
                   const displayMembers = getFilteredMembersByType(monthlyMembers);
                   return displayMembers.length > 0 ? (
-                    displayMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => openMemberDialog(member)}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <h3 className="font-semibold">{member.fullName}</h3>
-                            <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                    displayMembers.map((member) => {
+                      const category = getMemberCategory(member);
+                      return (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => openMemberDialog(member)}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              {member.photoDataUrl && (
+                                <img src={member.photoDataUrl} alt="" className="h-12 w-12 rounded-full object-cover border-2" />
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold">{member.fullName}</h3>
+                                  <Badge className={category.badge.className}>{category.badge.emoji} {category.badge.text}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 mt-1 text-xs">
+                                  <div>
+                                    <span className="text-muted-foreground">Membership Fee:</span>{' '}
+                                    <span className="font-medium">₱{member.membershipFeePaid ? '200 (Paid)' : 'Unpaid'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Subscription:</span>{' '}
+                                    <span className="font-medium">Monthly</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Expires:</span>{' '}
+                                    <span className="font-medium">{member.subscriptionExpiryDate}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="hidden md:block">
-                            <p className="text-sm">{member.email}</p>
-                            <p className="text-sm text-muted-foreground">{member.phone}</p>
-                          </div>
-                          <div className="hidden lg:block">
-                            <p className="text-sm">Start: {member.membershipStartDate}</p>
-                            <p className="text-sm text-muted-foreground">Subscription Expires: {member.subscriptionExpiryDate}</p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                db.members.update(member.id, { paymentType: 'per_session', subscriptionExpiryDate: '' } as any)
+                                  .then(() => {
+                                    setMembers(prev => prev.map(x => x.id === member.id ? { ...x, paymentType: 'per_session', subscriptionExpiryDate: '' } : x));
+                                    toast({ title: 'Subscription Cancelled', description: `${member.fullName} is now on per-session basis.` });
+                                  });
+                              }}
+                              className="text-orange-700 border-orange-200 hover:bg-orange-50"
+                            >
+                              Cancel Subscription
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Badge className="bg-green-100 text-green-700 border-green-200">🟢 Active</Badge>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); /* cancel -> per session */ db.members.update(member.id, { paymentType: 'per_session', subscriptionExpiryDate: '' } as any).then(() => setMembers(prev => prev.map(x => x.id === member.id ? { ...x, paymentType: 'per_session', subscriptionExpiryDate: '' } : x))); }}
-                            className="text-orange-700 border-orange-200 hover:bg-orange-50"
-                          >
-                            Cancel Subscription
-                          </Button>
-                        </div>
-                      </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        {activeFilter ? 'No members match the current filter.' : 'No monthly subscribers found.'}
+                      </p>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      {activeFilter ? 'No members match the current filter.' : 'No active members match your search.'}
-                    </p>
-                  </div>
-                );
+                  );
                 })()}
               </div>
             </CardContent>
@@ -330,66 +400,190 @@ const Members = () => {
         <TabsContent value="per_session">
           <Card className="border-0 shadow-md">
             <CardHeader>
-              <CardTitle>Per Session Members</CardTitle>
+              <CardTitle>🟦 Per Session Members</CardTitle>
+              <p className="text-sm text-muted-foreground">Members who pay per visit</p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {(() => {
-                  const perSessionMembers = members.filter(m => !(m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()) && (m.status !== 'archived'));
+                  const perSessionMembers = filteredMembers.filter(m => {
+                    const category = getMemberCategory(m);
+                    return category.type === 'per_session';
+                  });
                   const displayMembers = getFilteredMembersByType(perSessionMembers);
                   return displayMembers.length > 0 ? (
-                    displayMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => openMemberDialog(member)}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <h3 className="font-semibold">{member.fullName}</h3>
-                            <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                    displayMembers.map((member) => {
+                      const category = getMemberCategory(member);
+                      return (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => openMemberDialog(member)}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              {member.photoDataUrl && (
+                                <img src={member.photoDataUrl} alt="" className="h-12 w-12 rounded-full object-cover border-2" />
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold">{member.fullName}</h3>
+                                  <Badge className={category.badge.className}>{category.badge.emoji} {category.badge.text}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 mt-1 text-xs">
+                                  <div>
+                                    <span className="text-muted-foreground">Membership Fee:</span>{' '}
+                                    <span className="font-medium">₱200 (Paid)</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Total Sessions:</span>{' '}
+                                    <span className="font-medium">{member.sessionCount || 0}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Last Session:</span>{' '}
+                                    <span className="font-medium">{member.lastSessionDate || 'Never'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="hidden md:block">
-                            <p className="text-sm">{member.email}</p>
-                            <p className="text-sm text-muted-foreground">{member.phone}</p>
-                          </div>
-                          <div className="hidden lg:block">
-                            <p className="text-sm">Start: {member.membershipStartDate}</p>
-                            <p className="text-sm text-muted-foreground">Last Subscription Expiry: {member.subscriptionExpiryDate || '-'}</p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setRenewMember(member); 
+                                setRenewMonths(1); 
+                                setRenewStep('confirm'); 
+                                setIsRenewDialogOpen(true); 
+                              }}
+                              className="text-green-700 border-green-200 hover:bg-green-50"
+                            >
+                              Switch to Monthly
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setArchiveMember(member); 
+                                setIsArchiveDialogOpen(true); 
+                              }}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              Archive
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Badge className="bg-orange-100 text-orange-700 border-orange-200">🔴 Expired</Badge>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); setRenewMember(member); setRenewMonths(1); setRenewStep('confirm'); setIsRenewDialogOpen(true); }}
-                            className="text-green-700 border-green-200 hover:bg-green-50"
-                          >
-                            Subscribe to Monthly
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); setArchiveMember(member); setIsArchiveDialogOpen(true); }}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            Archive
-                          </Button>
-                        </div>
-                      </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        {activeFilter ? 'No members match the current filter.' : 'No per-session members found.'}
+                      </p>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      {activeFilter ? 'No members match the current filter.' : 'No expired members match your search.'}
-                    </p>
-                  </div>
-                );
+                  );
+                })()}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="member_only">
+          <Card className="border-0 shadow-md">
+            <CardHeader>
+              <CardTitle>🟧 Member Only</CardTitle>
+              <p className="text-sm text-muted-foreground">Members who haven't chosen a subscription option yet</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {(() => {
+                  const memberOnlyMembers = filteredMembers.filter(m => {
+                    const category = getMemberCategory(m);
+                    return category.type === 'member_only';
+                  });
+                  const displayMembers = getFilteredMembersByType(memberOnlyMembers);
+                  return displayMembers.length > 0 ? (
+                    displayMembers.map((member) => {
+                      const category = getMemberCategory(member);
+                      return (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => openMemberDialog(member)}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              {member.photoDataUrl && (
+                                <img src={member.photoDataUrl} alt="" className="h-12 w-12 rounded-full object-cover border-2" />
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold">{member.fullName}</h3>
+                                  <Badge className={category.badge.className}>{category.badge.emoji} {category.badge.text}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">ID: {member.id}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 mt-1 text-xs">
+                                  <div>
+                                    <span className="text-muted-foreground">Membership Fee:</span>{' '}
+                                    <span className="font-medium">₱200 (Paid)</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Subscription:</span>{' '}
+                                    <span className="font-medium text-orange-600">Not Subscribed Yet</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Access Type:</span>{' '}
+                                    <span className="font-medium">Inactive</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setRenewMember(member); 
+                                setRenewMonths(1); 
+                                setRenewStep('confirm'); 
+                                setIsRenewDialogOpen(true); 
+                              }}
+                              className="text-green-700 border-green-200 hover:bg-green-50"
+                            >
+                              Start Monthly Subscription
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                db.members.update(member.id, { paymentType: 'per_session' } as any)
+                                  .then(() => {
+                                    setMembers(prev => prev.map(x => x.id === member.id ? { ...x, paymentType: 'per_session' } : x));
+                                    toast({ title: 'Set to Per Session', description: `${member.fullName} will now pay per visit.` });
+                                  });
+                              }}
+                              className="text-blue-700 border-blue-200 hover:bg-blue-50"
+                            >
+                              Set to Per Session
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        {activeFilter ? 'No members match the current filter.' : 'All members have chosen a subscription option.'}
+                      </p>
+                    </div>
+                  );
                 })()}
               </div>
             </CardContent>
@@ -399,7 +593,8 @@ const Members = () => {
         <TabsContent value="archived">
           <Card className="border-0 shadow-md">
             <CardHeader>
-              <CardTitle>Archived</CardTitle>
+              <CardTitle>🟥 Archived</CardTitle>
+              <p className="text-sm text-muted-foreground">Inactive or archived members</p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -717,11 +912,32 @@ const Members = () => {
               {renewStep === 'confirm' && (
                 <>
                   <DialogHeader>
-                    <DialogTitle className="text-2xl">Confirm Renewal</DialogTitle>
+                    <DialogTitle className="text-2xl">Start Monthly Subscription</DialogTitle>
                     <DialogDescription>
-                      Are you sure you want to renew {renewMember.fullName} for {renewMonths} {renewMonths === 1 ? 'month' : 'months'}?
+                      Subscribe {renewMember.fullName} to monthly access for {renewMonths} {renewMonths === 1 ? 'month' : 'months'}?
                     </DialogDescription>
                   </DialogHeader>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Member</span><span className="font-medium">{renewMember.fullName}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Duration</span><span className="font-medium">{renewMonths} month{renewMonths > 1 ? 's' : ''}</span></div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="font-semibold">₱{500 * renewMonths}</span>
+                    </div>
+                    <div className="pt-2">
+                      <Label>Payment Method</Label>
+                      <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                          <SelectItem value="GCash">GCash</SelectItem>
+                          <SelectItem value="Card">Card</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   <div className="flex gap-2 justify-end pt-2">
                     <Button variant="outline" onClick={() => setRenewStep('select')}>
                       Back
@@ -733,37 +949,53 @@ const Members = () => {
                         if (!member) return;
                         const months = renewMonths;
                         const nowIso = new Date().toISOString().split('T')[0];
-                        const currentExpiry = new Date(member.membershipExpiryDate);
-                        const baseDate = (member.status === 'expired' || member.status === 'archived') ? new Date() : currentExpiry;
-                        const newExpiry = new Date(baseDate);
-                        newExpiry.setMonth(newExpiry.getMonth() + months);
-                        const iso = newExpiry.toISOString().split('T')[0];
+                        const addMonthsToDate = (startIso: string, months: number): string => {
+                          const date = new Date(startIso);
+                          const startDay = date.getDate();
+                          date.setMonth(date.getMonth() + months);
+                          if (date.getDate() !== startDay) {
+                            date.setDate(0);
+                          }
+                          return date.toISOString().split('T')[0];
+                        };
+                        const subscriptionExpiry = addMonthsToDate(nowIso, months);
 
+                        // Update member to monthly subscription
                         await db.members.update(member.id, {
-                          membershipStartDate: nowIso,
-                          membershipExpiryDate: iso,
+                          paymentType: 'monthly',
+                          subscriptionExpiryDate: subscriptionExpiry,
                           status: 'active',
                           isActive: true,
                         } as any);
 
+                        // Record payment
+                        await addPayment({
+                          date: nowIso,
+                          amount: 500 * months,
+                          method: paymentMethod,
+                          category: 'Monthly Subscription',
+                          description: `Monthly subscription (${months} month${months > 1 ? 's' : ''}) for ${member.fullName} (${member.id})`,
+                          memberId: member.id,
+                        });
+
                         setMembers(prev => prev.map(m => m.id === member.id ? {
                           ...m,
-                          membershipStartDate: nowIso,
-                          membershipExpiryDate: iso,
+                          paymentType: 'monthly',
+                          subscriptionExpiryDate: subscriptionExpiry,
                           status: 'active',
                           isActive: true,
                         } : m));
 
-                        setTabsValue('active');
+                        setTabsValue('monthly');
                         setIsRenewDialogOpen(false);
                         setRenewMember(null);
                         setRenewMonths(1);
                         setRenewStep('select');
 
-                        toast({ title: 'Membership Renewed', description: `Membership for ${member.fullName} has been renewed for ${months} ${months === 1 ? 'month' : 'months'}.` });
+                        toast({ title: 'Subscription Started', description: `${member.fullName} is now subscribed until ${subscriptionExpiry}.` });
                       }}
                     >
-                      Confirm
+                      Confirm & Pay
                     </Button>
                   </div>
                 </>

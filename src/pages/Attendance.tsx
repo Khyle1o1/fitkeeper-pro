@@ -52,6 +52,8 @@ const Attendance = () => {
   // Member per-session payment modal
   const [memberPayOpen, setMemberPayOpen] = useState(false);
   const [memberForPayment, setMemberForPayment] = useState<any>(null);
+  // Walk-in to member conversion
+  const [showWalkInConversion, setShowWalkInConversion] = useState(false);
 
   const refreshTodayAttendance = async () => {
     const today = new Date();
@@ -165,6 +167,15 @@ const Attendance = () => {
       date: dateStr,
       checkInTime,
     } as any);
+
+    // Update session count and last session date for per-session members
+    if (member.paymentType === 'per_session') {
+      const newSessionCount = (member.sessionCount || 0) + 1;
+      await db.members.update(member.id, {
+        sessionCount: newSessionCount,
+        lastSessionDate: dateStr,
+      } as any);
+    }
 
     setCheckedInMember({
       id: member.id,
@@ -355,11 +366,32 @@ const Attendance = () => {
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">No lifetime fee for walk-ins. They pay the walk-in per session rate every visit.</p>
+            <p className="text-xs text-muted-foreground">Walk-ins pay ₱{Number(appPricing.perSessionWalkInFee) || 100} per visit. No membership fee required.</p>
 
-            <div className="flex items-center justify-between">
+            <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md border border-blue-200 dark:border-blue-800 mt-3">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">💡 Become a Member?</p>
+              <p className="text-xs text-gray-700 dark:text-gray-200 mb-2">
+                Pay ₱{Number(appPricing.membershipFee) || 200} membership fee + ₱{Number(appPricing.perSessionWalkInFee) || 100} today's session to become a member and get:
+              </p>
+              <ul className="text-xs text-gray-700 dark:text-gray-200 list-disc list-inside space-y-1">
+                <li>Lower per-session rate (₱{Number(appPricing.perSessionMemberFee) || 80} vs ₱{Number(appPricing.perSessionWalkInFee) || 100})</li>
+                <li>Option to subscribe monthly</li>
+                <li>Member benefits and tracking</li>
+              </ul>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2 text-blue-700 border-blue-300 hover:bg-blue-100 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900"
+                disabled={!walkInName.trim()}
+                onClick={() => setShowWalkInConversion(true)}
+              >
+                Register as Member
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-muted-foreground">
-                Total: <span className="font-semibold text-foreground">₱{Number(appPricing.perSessionWalkInFee) || 100}</span>
+                Today's Total: <span className="font-semibold text-foreground">₱{Number(appPricing.perSessionWalkInFee) || 100}</span>
               </div>
               <Button
                 className="bg-gradient-primary hover:opacity-90"
@@ -619,14 +651,38 @@ const Attendance = () => {
   <AlertDialog open={memberPayOpen} onOpenChange={setMemberPayOpen}>
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Per-Session Payment Required</AlertDialogTitle>
+        <AlertDialogTitle>⏱️ Per-Session Payment Required</AlertDialogTitle>
         <AlertDialogDescription>
           {memberForPayment ? `${memberForPayment.fullName} does not have an active monthly subscription.` : ''}
         </AlertDialogDescription>
       </AlertDialogHeader>
-      <div className="space-y-2 text-sm">
-        <div className="flex justify-between"><span className="text-muted-foreground">Member</span><span className="font-medium">{memberForPayment?.fullName}</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">₱{Number(appPricing.perSessionMemberFee) || 80}</span></div>
+      <div className="space-y-3 text-sm">
+        <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+          <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Member Type:</p>
+          <p className="text-xs text-gray-700 dark:text-gray-200">
+            {memberForPayment?.paymentType === 'per_session' 
+              ? '🟦 Per Session Member - Pays per visit at member rate'
+              : '🟧 Member Only - Not subscribed yet, will pay per session'}
+          </p>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Member:</span>
+            <span className="font-medium">{memberForPayment?.fullName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Session Rate (Member):</span>
+            <span className="font-medium">₱{Number(appPricing.perSessionMemberFee) || 80}</span>
+          </div>
+          {memberForPayment?.sessionCount !== undefined && (
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Total Sessions:</span>
+              <span>{memberForPayment.sessionCount}</span>
+            </div>
+          )}
+        </div>
+        
         <div className="space-y-2 pt-2">
           <Label>Payment Method</Label>
           <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
@@ -639,6 +695,12 @@ const Attendance = () => {
               <SelectItem value="Card">Card</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        
+        <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md text-xs">
+          <p className="text-gray-700 dark:text-gray-200">
+            💡 <strong>Tip:</strong> Switch to monthly subscription to save! Visit the Members page to subscribe.
+          </p>
         </div>
       </div>
       <AlertDialogFooter>
@@ -661,11 +723,142 @@ const Attendance = () => {
             toast({ title: 'Payment Successful', description: `Paid ₱${fee}. Check-in completed.` });
           }}
         >
-          Pay & Check In
+          Pay ₱{Number(appPricing.perSessionMemberFee) || 80} & Check In
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
+
+      {/* Walk-In to Member Conversion Modal */}
+      <AlertDialog open={showWalkInConversion} onOpenChange={setShowWalkInConversion}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Register Walk-In as Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Convert {walkInName} to a registered gym member
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">This will create a member account with the following charges:</p>
+            <div className="bg-muted/30 p-3 rounded-md space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Membership Fee (Lifetime):</span>
+                <span className="font-medium">₱{Number(appPricing.membershipFee) || 200}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Today's Session Fee:</span>
+                <span className="font-medium">₱{Number(appPricing.perSessionWalkInFee) || 100}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="font-semibold">Total Due:</span>
+                <span className="font-bold">₱{(Number(appPricing.membershipFee) || 200) + (Number(appPricing.perSessionWalkInFee) || 100)}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="GCash">GCash</SelectItem>
+                  <SelectItem value="Card">Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md text-xs">
+              <p className="font-medium text-blue-700 dark:text-blue-300">Note:</p>
+              <p className="text-gray-700 dark:text-gray-200 mt-1">After registration, you can choose to:</p>
+              <ul className="list-disc list-inside mt-1 text-gray-700 dark:text-gray-200">
+                <li>Subscribe to monthly access</li>
+                <li>Continue paying per session at member rate (₱{Number(appPricing.perSessionMemberFee) || 80})</li>
+              </ul>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { generateMemberId } = await import('@/data/mockData');
+                const { generateQrCodeDataUrl } = await import('@/lib/utils');
+                const memberId = generateMemberId();
+                const qrCode = await generateQrCodeDataUrl(memberId);
+                const now = new Date();
+                const dateStr = now.toISOString().split('T')[0];
+                const checkInTime = now.toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                  timeZone: 'Asia/Manila',
+                });
+
+                // Create member account
+                await db.members.add({
+                  id: memberId,
+                  fullName: walkInName,
+                  email: `${walkInName.toLowerCase().replace(/\s+/g, '')}@walkin.temp`,
+                  phone: 'N/A',
+                  membershipStartDate: dateStr,
+                  membershipExpiryDate: '2099-12-31',
+                  membershipDuration: 'Lifetime',
+                  qrCodeDataUrl: qrCode,
+                  status: 'active',
+                  isActive: true,
+                  membershipFeePaid: true,
+                  paymentType: 'per_session',
+                  sessionCount: 1,
+                  lastSessionDate: dateStr,
+                  invite_code: memberId,
+                  invite_count: 0,
+                } as any);
+
+                // Record membership fee payment
+                await addPayment({
+                  date: dateStr,
+                  amount: Number(appPricing.membershipFee) || 200,
+                  method: paymentMethod,
+                  category: 'Membership Fee',
+                  description: `Lifetime membership fee for ${walkInName} (converted from walk-in)`,
+                  memberId,
+                });
+
+                // Record session fee payment
+                await addPayment({
+                  date: dateStr,
+                  amount: Number(appPricing.perSessionWalkInFee) || 100,
+                  method: paymentMethod,
+                  category: 'Member Session Fee',
+                  description: `First session for ${walkInName} (${memberId})`,
+                  memberId,
+                });
+
+                // Record attendance
+                await db.attendance.add({
+                  id: `${Date.now()}`,
+                  memberId,
+                  memberName: walkInName,
+                  date: dateStr,
+                  checkInTime,
+                } as any);
+
+                setShowWalkInConversion(false);
+                setWalkInName('');
+                setPaymentMethod('Cash');
+                refreshTodayAttendance();
+                
+                toast({ 
+                  title: 'Member Registered Successfully!', 
+                  description: `${walkInName} is now a member (ID: ${memberId}) and checked in.`,
+                  duration: 5000,
+                });
+              }}
+            >
+              Register & Check In
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* QR Scanner Modal */}
       <QRScanner
