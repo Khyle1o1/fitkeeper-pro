@@ -17,6 +17,7 @@
   "dependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/barcode-scanner": "^2.1.0",
+    "@capacitor/camera": "^7.0.2",
     "@capacitor/core": "^7.4.3",
     "@capacitor/filesystem": "^7.0.1",
     "@capacitor/ios": "^7.4.3",

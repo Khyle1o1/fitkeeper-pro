@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Camera, Upload } from 'lucide-react';
 import { generateMemberId } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import jsPDF from 'jspdf';
 import { isNative, saveDataUrlNative } from '@/lib/native';
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 const AddMember = () => {
   const navigate = useNavigate();
@@ -147,6 +148,32 @@ const AddMember = () => {
       setFormData(prev => ({ ...prev, photoDataUrl: reader.result as string }));
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleTakePicture = async () => {
+    try {
+      const image = await CapacitorCamera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+      });
+
+      if (image.dataUrl) {
+        setFormData(prev => ({ ...prev, photoDataUrl: image.dataUrl as string }));
+        toast({
+          title: 'Photo Captured',
+          description: 'Member photo has been captured successfully.',
+        });
+      }
+    } catch (error) {
+      console.error('Error taking picture:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to capture photo. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const downloadDataUrl = async (dataUrl: string, filename: string) => {
@@ -423,10 +450,49 @@ const AddMember = () => {
             {/* Photo Upload */}
             <div className="space-y-2">
               <Label htmlFor="photo">Member Photo</Label>
-              <input id="photo" name="photo" type="file" accept="image/*" onChange={handlePhotoChange} />
-              {formData.photoDataUrl && (
-                <img src={formData.photoDataUrl} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
-              )}
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTakePicture}
+                    className="flex-1"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Take Picture
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('photo')?.click()}
+                    className="flex-1"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
+                <input
+                  id="photo"
+                  name="photo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+                {formData.photoDataUrl && (
+                  <div className="flex items-center gap-3">
+                    <img src={formData.photoDataUrl} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFormData(prev => ({ ...prev, photoDataUrl: null }))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Summary */}
