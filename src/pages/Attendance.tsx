@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from '@/components/ui/pagination';
-import { QrCode, UserCheck, Camera } from 'lucide-react';
+import { QrCode, UserCheck, Camera, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QRScanner from '@/components/QRScanner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,8 @@ const Attendance = () => {
   const [confirmType, setConfirmType] = useState<'checkin' | 'checkout'>('checkin');
   const [memberForAction, setMemberForAction] = useState<any>(null);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showingToday, setShowingToday] = useState(false);
 
   // Check-in type state (Member vs Walk-In)
   const [checkInType, setCheckInType] = useState<'member' | 'walkin'>(() => {
@@ -74,6 +78,19 @@ const Attendance = () => {
     // Persist check-in type selection
     localStorage.setItem('attendance_checkin_type', checkInType);
   }, [checkInType]);
+
+  // Handle URL query parameter for date filter
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam === 'today') {
+      setShowingToday(true);
+    }
+  }, [searchParams]);
+
+  const clearDateFilter = () => {
+    setShowingToday(false);
+    setSearchParams({});
+  };
 
   useEffect(() => {
     // Determine if current walk-in name is a first-time visitor
@@ -194,6 +211,26 @@ const Attendance = () => {
         <h1 className="text-3xl font-bold">Attendance Tracking</h1>
         <p className="text-muted-foreground">Record member check-ins and view daily attendance</p>
       </div>
+
+      {/* Active Date Filter Indicator */}
+      {showingToday && (
+        <Alert className="border-success/50 bg-success/5">
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              📅 Showing Today's Attendance ({new Date().toLocaleDateString()})
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearDateFilter}
+              className="h-6 px-2"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear Filter
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-4">
         <div>

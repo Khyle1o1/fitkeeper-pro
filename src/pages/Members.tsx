@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Archive } from 'lucide-react';
+import { Plus, Search, Archive, X } from 'lucide-react';
 import { getMembershipStatus } from '@/data/mockData';
 import { Member } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +13,7 @@ import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { generateBarcodeDataUrl, generateQrCodeDataUrl } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -32,6 +33,8 @@ const Members = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteMemberState, setDeleteMemberState] = useState<Member | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash' | 'Card'>('Cash');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -73,6 +76,43 @@ const Members = () => {
 
     fetchMembers();
   }, [toast]);
+
+  // Handle URL query parameters for filtering
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const expiry = searchParams.get('expiry');
+
+    if (status === 'active') {
+      setActiveFilter('active');
+      setTabsValue('monthly');
+    } else if (expiry === '7days') {
+      setActiveFilter('expiring');
+      setTabsValue('monthly');
+    } else {
+      setActiveFilter(null);
+    }
+  }, [searchParams]);
+
+  const clearFilter = () => {
+    setActiveFilter(null);
+    setSearchParams({});
+  };
+
+  // Filter members based on active filter
+  const getFilteredMembersByType = (baseMembers: Member[]) => {
+    if (activeFilter === 'active') {
+      return baseMembers.filter(m => m.isActive && m.status === 'active');
+    } else if (activeFilter === 'expiring') {
+      const today = new Date();
+      const in7Days = new Date();
+      in7Days.setDate(today.getDate() + 7);
+      return baseMembers.filter(m => {
+        const expiryDate = new Date(m.membershipExpiryDate);
+        return m.isActive && expiryDate >= today && expiryDate <= in7Days;
+      });
+    }
+    return baseMembers;
+  };
 
   const filteredMembers = members.filter(member =>
     member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -180,6 +220,27 @@ const Members = () => {
         </Link>
       </div>
 
+      {/* Active Filter Indicator */}
+      {activeFilter && (
+        <Alert className="border-primary/50 bg-primary/5">
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              {activeFilter === 'active' && '🔍 Showing only Active Members'}
+              {activeFilter === 'expiring' && '⚠️ Showing only Memberships Expiring Within 7 Days'}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilter}
+              className="h-6 px-2"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear Filter
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Search */}
       <Card className="border-0 shadow-md">
         <CardContent className="pt-6">
@@ -212,8 +273,11 @@ const Members = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {members.filter(m => m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()).length > 0 ? (
-                  members.filter(m => m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()).map((member) => (
+                {(() => {
+                  const monthlyMembers = members.filter(m => m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date());
+                  const displayMembers = getFilteredMembersByType(monthlyMembers);
+                  return displayMembers.length > 0 ? (
+                    displayMembers.map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
@@ -252,9 +316,12 @@ const Members = () => {
                   ))
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground">No active members match your search.</p>
+                    <p className="text-muted-foreground">
+                      {activeFilter ? 'No members match the current filter.' : 'No active members match your search.'}
+                    </p>
                   </div>
-                )}
+                );
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -267,8 +334,11 @@ const Members = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {members.filter(m => !(m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()) && (m.status !== 'archived')).length > 0 ? (
-                  members.filter(m => !(m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()) && (m.status !== 'archived')).map((member) => (
+                {(() => {
+                  const perSessionMembers = members.filter(m => !(m.paymentType === 'monthly' && !!m.subscriptionExpiryDate && new Date(m.subscriptionExpiryDate) >= new Date()) && (m.status !== 'archived'));
+                  const displayMembers = getFilteredMembersByType(perSessionMembers);
+                  return displayMembers.length > 0 ? (
+                    displayMembers.map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
@@ -315,9 +385,12 @@ const Members = () => {
                   ))
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground">No expired members match your search.</p>
+                    <p className="text-muted-foreground">
+                      {activeFilter ? 'No members match the current filter.' : 'No expired members match your search.'}
+                    </p>
                   </div>
-                )}
+                );
+                })()}
               </div>
             </CardContent>
           </Card>

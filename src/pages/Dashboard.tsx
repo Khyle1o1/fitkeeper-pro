@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, UserCheck, AlertTriangle, Clock, Trash2 } from 'lucide-react';
+import { Users, UserCheck, AlertTriangle, Clock, Trash2, ExternalLink } from 'lucide-react';
 import { db, initLocalDb, clearAllData, resetDatabase } from '@/lib/db';
 import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Dashboard = () => {
   const [totalActiveMembers, setTotalActiveMembers] = useState(0);
@@ -124,48 +126,87 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-md bg-gradient-to-br from-primary/5 to-primary/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Active Members</CardTitle>
-            <Users className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalActiveMembers}</div>
-            <p className="text-xs text-muted-foreground">
-              +2 from last month
-            </p>
-          </CardContent>
-        </Card>
+      <TooltipProvider>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Total Active Members Card */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/members?status=active" className="group">
+                <Card className="border-0 shadow-md bg-gradient-to-br from-primary/5 to-primary/10 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:from-primary/10 hover:to-primary/15 cursor-pointer relative overflow-hidden">
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="h-3 w-3 text-primary" />
+                  </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Active Members</CardTitle>
+                    <Users className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{totalActiveMembers}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Click to view all active members
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View all active members</p>
+            </TooltipContent>
+          </Tooltip>
 
-        <Card className="border-0 shadow-md bg-gradient-to-br from-success/5 to-success/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Attendance</CardTitle>
-            <UserCheck className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dailyAttendance}</div>
-            <p className="text-xs text-muted-foreground">
-              +12% from yesterday
-            </p>
-          </CardContent>
-        </Card>
+          {/* Today's Attendance Card */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/attendance?date=today" className="group">
+                <Card className="border-0 shadow-md bg-gradient-to-br from-success/5 to-success/10 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:from-success/10 hover:to-success/15 cursor-pointer relative overflow-hidden">
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="h-3 w-3 text-success" />
+                  </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Today's Attendance</CardTitle>
+                    <UserCheck className="h-4 w-4 text-success" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{dailyAttendance}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Click to view today's check-ins
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View today's attendance records</p>
+            </TooltipContent>
+          </Tooltip>
 
-        <Card className="border-0 shadow-md bg-gradient-to-br from-warning/5 to-warning/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Memberships</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{expiringMembers.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Within 7 days
-            </p>
-          </CardContent>
-        </Card>
-
-        
-      </div>
+          {/* Expiring Memberships Card */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/members?expiry=7days" className="group">
+                <Card className="border-0 shadow-md bg-gradient-to-br from-warning/5 to-warning/10 transition-all duration-300 hover:shadow-lg hover:scale-105 hover:from-warning/10 hover:to-warning/15 cursor-pointer relative overflow-hidden">
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="h-3 w-3 text-warning" />
+                  </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Expiring Memberships</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{expiringMembers.length}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Within 7 days - Click to view
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View soon-to-expire memberships</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
