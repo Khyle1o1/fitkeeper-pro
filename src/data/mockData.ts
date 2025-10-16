@@ -19,6 +19,10 @@ export interface Member {
   paymentType?: 'monthly' | 'per_session';
   // For monthly subscriptions, track subscription expiry separately if needed
   subscriptionExpiryDate?: string;
+  // Referral system fields
+  invite_code?: string; // Auto-generated from member ID
+  referred_by?: string | null; // Invite code of the member who referred this member
+  invite_count?: number; // Number of successful referrals (default 0)
 }
 
 export interface AttendanceRecord {

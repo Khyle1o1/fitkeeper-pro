@@ -25,6 +25,7 @@ const AddMember = () => {
     membershipStartDate: new Date().toISOString().split('T')[0],
     membershipDurationMonths: 1,
     photoDataUrl: null as string | null,
+    referralCode: '', // Optional referral code
   });
   const [paymentType, setPaymentType] = useState<'monthly' | 'per_session'>('monthly');
   const [subscriptionMonths, setSubscriptionMonths] = useState<number>(1);
@@ -87,6 +88,21 @@ const AddMember = () => {
       ? addMonths(formData.membershipStartDate, subscriptionMonths || 1)
       : '';
 
+    // Validate and process referral code
+    let referrer = null;
+    if (formData.referralCode && formData.referralCode.trim()) {
+      // Check if referral code exists
+      referrer = await db.members.where('invite_code').equals(formData.referralCode.trim()).first();
+      if (!referrer) {
+        toast({
+          title: 'Invalid Referral Code',
+          description: 'The referral code you entered does not exist.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     await db.members.add({
       id: memberId,
       fullName: formData.fullName,
@@ -102,7 +118,53 @@ const AddMember = () => {
       membershipFeePaid: true,
       paymentType,
       subscriptionExpiryDate,
+      invite_code: memberId, // Auto-generate invite code from member ID
+      referred_by: referrer ? formData.referralCode.trim() : null,
+      invite_count: 0,
     } as any);
+
+    // If referred by someone, increment their invite count
+    if (referrer) {
+      const currentInviteCount = referrer.invite_count || 0;
+      const newInviteCount = currentInviteCount + 1;
+      
+      // Update referrer's invite count
+      await db.members.update(referrer.id, { 
+        invite_count: newInviteCount 
+      } as any);
+
+      // Check if referrer reached 4 invites
+      if (newInviteCount === 4) {
+        // Extend membership by 1 month
+        const currentExpiry = new Date(referrer.subscriptionExpiryDate || referrer.membershipExpiryDate);
+        const newExpiry = new Date(currentExpiry);
+        newExpiry.setMonth(newExpiry.getMonth() + 1);
+        const newExpiryIso = newExpiry.toISOString().split('T')[0];
+
+        // Update the appropriate expiry date based on payment type
+        if (referrer.paymentType === 'monthly' && referrer.subscriptionExpiryDate) {
+          await db.members.update(referrer.id, {
+            subscriptionExpiryDate: newExpiryIso,
+            invite_count: 0, // Reset count
+          } as any);
+        } else {
+          await db.members.update(referrer.id, {
+            membershipExpiryDate: newExpiryIso,
+            invite_count: 0, // Reset count
+          } as any);
+        }
+
+        toast({
+          title: '🎉 Referral Reward Earned!',
+          description: `${referrer.fullName} has earned 1 free month for inviting 4 members!`,
+        });
+      } else {
+        toast({
+          title: 'Referral Recorded',
+          description: `${referrer.fullName} now has ${newInviteCount}/4 successful referrals.`,
+        });
+      }
+    }
 
     // Record membership fee and initial selection (month or session)
     const pricing = await getAppPricing();
@@ -422,6 +484,22 @@ const AddMember = () => {
                   required
                 />
               </div>
+            </div>
+
+            {/* Invite/Referral Code */}
+            <div className="space-y-2">
+              <Label htmlFor="referralCode">Invite Code (Optional)</Label>
+              <Input
+                id="referralCode"
+                name="referralCode"
+                value={formData.referralCode}
+                onChange={handleInputChange}
+                placeholder="Enter invite code from another member"
+              />
+              <p className="text-sm text-muted-foreground">
+                If this member was invited by another member, enter their invite code here. 
+                Members who invite 4 people earn 1 free month!
+              </p>
             </div>
 
             {/* Start Date and Lifetime Membership */}

@@ -438,6 +438,47 @@ const Members = () => {
                     </div>
                   </div>
 
+                  {/* Referral Information */}
+                  <div className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                    <h4 className="font-bold text-base mb-4 text-blue-700 dark:text-blue-300">Referral Program</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Your Invite Code</p>
+                        <code className="inline-block px-3 py-2 bg-white dark:bg-gray-800 rounded-md font-mono text-lg font-bold border-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300">
+                          {selectedMember.invite_code || selectedMember.id}
+                        </code>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">Share this code to invite new members</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Referral Progress</p>
+                        <div className="mt-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                              {selectedMember.invite_count || 0}/4
+                            </span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">successful invites</span>
+                          </div>
+                          {(selectedMember.invite_count || 0) > 0 && (selectedMember.invite_count || 0) < 4 && (
+                            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                              {4 - (selectedMember.invite_count || 0)} more {4 - (selectedMember.invite_count || 0) === 1 ? 'invite' : 'invites'} to earn 1 free month! 🎁
+                            </p>
+                          )}
+                          {(selectedMember.invite_count || 0) === 0 && (
+                            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                              Invite 4 members to earn 1 free month! 🎁
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {selectedMember.referred_by && (
+                        <div className="sm:col-span-2 pt-3 border-t border-blue-200 dark:border-blue-800">
+                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Referred By</p>
+                          <p className="font-bold text-base text-blue-700 dark:text-blue-300">Invite Code: {selectedMember.referred_by}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                     <div className="flex flex-col items-center gap-2">
                       <p className="text-sm text-muted-foreground">QR Code</p>

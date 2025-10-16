@@ -154,6 +154,59 @@ const EditMember = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Referral Information Card */}
+      <Card className="border-0 shadow-md max-w-2xl">
+        <CardHeader>
+          <CardTitle>Referral Program</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Invite Code */}
+            <div className="space-y-2">
+              <Label>Your Invite Code</Label>
+              <Input
+                value={member.invite_code || member.id}
+                readOnly
+                className="font-mono font-semibold text-lg"
+              />
+              <p className="text-sm text-muted-foreground">
+                Share this code with new members. Invite 4 people to earn 1 free month!
+              </p>
+            </div>
+
+            {/* Referral Progress */}
+            <div className="p-5 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Successful Invites</p>
+                  <div className="flex items-center gap-2 mt-1 mb-2">
+                    <span className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+                      {member.invite_count || 0}/4
+                    </span>
+                  </div>
+                  {(member.invite_count || 0) > 0 && (member.invite_count || 0) < 4 && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                      {4 - (member.invite_count || 0)} more {4 - (member.invite_count || 0) === 1 ? 'invite' : 'invites'} to earn 1 free month! 🎁
+                    </p>
+                  )}
+                  {(member.invite_count || 0) === 0 && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                      Start inviting to earn free months! 🎁
+                    </p>
+                  )}
+                </div>
+                {member.referred_by && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">You Were Referred By</p>
+                    <p className="font-bold text-lg text-blue-700 dark:text-blue-300 mt-1">Invite Code: {member.referred_by}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

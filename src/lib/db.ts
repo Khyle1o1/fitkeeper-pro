@@ -19,9 +19,9 @@ export class PowerLiftDatabase extends Dexie {
 
   constructor() {
     super("powerlift-fitness-db");
-    // v8: extend settings with pricing fields and member fields
-    this.version(8).stores({
-      members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths",
+    // v9: add referral system fields (invite_code, referred_by, invite_count)
+    this.version(9).stores({
+      members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDurationMonths, invite_code, referred_by",
       attendance: "id, memberId, memberName, date, checkInTime, checkOutTime, is_walk_in, session_type, payment_method, price",
       renewals: "id, memberId, renewalDate",
       users: "id, username, email, role, isActive, createdAt",
@@ -154,7 +154,7 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     oneHour: 80,
     twoHours: 120,
     wholeDay: 200,
-  });
+  } as any);
   // Seed default app pricing
   await db.settings.put({
     id: 'app_pricing',
@@ -191,10 +191,32 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
   localStorage.setItem(adminSeededKey, "true");
 }
 
+export async function migrateExistingMembersForReferrals(): Promise<void> {
+  // Add invite_code to existing members that don't have one
+  const members = await db.members.toArray();
+  const updates: Array<Promise<any>> = [];
+  
+  for (const member of members) {
+    if (!member.invite_code) {
+      updates.push(
+        db.members.update(member.id, {
+          invite_code: member.id,
+          invite_count: member.invite_count || 0,
+        } as any)
+      );
+    }
+  }
+  
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+}
+
 export async function initLocalDb(): Promise<void> {
   await db.open();
   await seedDatabaseIfEmpty();
   await seedDefaultAdminIfNeeded();
+  await migrateExistingMembersForReferrals();
 }
 
 // Simple query helpers for future use
@@ -207,7 +229,7 @@ export const getWalkInPricing = async (): Promise<WalkInPricingSettings> => {
   return rec ? { oneHour: rec.oneHour, twoHours: rec.twoHours, wholeDay: rec.wholeDay } : { oneHour: 0, twoHours: 0, wholeDay: 0 };
 };
 export const setWalkInPricing = async (pricing: WalkInPricingSettings): Promise<void> => {
-  await db.settings.put({ id: 'walkin_pricing', ...pricing });
+  await db.settings.put({ id: 'walkin_pricing', ...pricing } as any);
 };
 
 // App pricing helpers (membership fee + monthly + per-session fees)
