@@ -13,6 +13,8 @@ const Reports = () => {
     retentionRate: 0,
     walkInIncome: 0,
     membershipFees: 0,
+    monthlySubscriptions: 0,
+    memberSessionFees: 0,
     otherIncome: 0,
   });
 
@@ -31,7 +33,9 @@ const Reports = () => {
       const payments = await getAllPayments();
       const thisMonth = payments.filter(p => (p.date || '').startsWith(ym));
       const membershipFees = thisMonth.filter(p => p.category === 'Membership Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
-      const walkInIncome = thisMonth.filter(p => p.category === 'Walk-In Daily Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const monthlySubscriptions = thisMonth.filter(p => p.category === 'Monthly Subscription').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const memberSessionFees = thisMonth.filter(p => p.category === 'Member Session Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const walkInIncome = thisMonth.filter(p => p.category === 'Walk-In Session Fee').reduce((s, p) => s + (Number(p.amount) || 0), 0);
       const otherIncome = thisMonth.filter(p => p.category === 'Other').reduce((s, p) => s + (Number(p.amount) || 0), 0);
       
       // Get active members (IndexedDB cannot index boolean keys reliably; query by string index then filter)
@@ -58,6 +62,8 @@ const Reports = () => {
         retentionRate,
         walkInIncome,
         membershipFees,
+        monthlySubscriptions,
+        memberSessionFees,
         otherIncome,
       });
     };
@@ -153,7 +159,7 @@ const Reports = () => {
               <p className="text-sm text-muted-foreground">Walk-In Daily Income</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold">₱{stats.membershipFees + stats.walkInIncome + stats.otherIncome}</p>
+              <p className="text-2xl font-bold">₱{stats.membershipFees + stats.monthlySubscriptions + stats.memberSessionFees + stats.walkInIncome + stats.otherIncome}</p>
               <p className="text-sm text-muted-foreground">Total Income</p>
             </div>
           </div>

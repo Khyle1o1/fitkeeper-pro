@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Camera, Upload } from 'lucide-react';
 import { generateMemberId } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { db, initLocalDb, getAppPricing, addPayment } from '@/lib/db';
+import { db, initLocalDb, getAppPricing, addPayment, checkAndApplyPromo } from '@/lib/db';
 import { generateQrCodeDataUrl } from '@/lib/utils';
+import { PromoRate } from '@/data/mockData';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import jsPDF from 'jspdf';
@@ -30,6 +31,11 @@ const AddMember = () => {
   const [paymentType, setPaymentType] = useState<'monthly' | 'per_session'>('monthly');
   const [subscriptionMonths, setSubscriptionMonths] = useState<number>(1);
   const [appPricing, setAppPricingState] = useState<{ membershipFee: number; monthlySubscriptionFee?: number; perSessionMemberFee?: number }>({ membershipFee: 200, monthlySubscriptionFee: 500, perSessionMemberFee: 80 });
+  
+  // Promo state
+  const [appliedPromo, setAppliedPromo] = useState<PromoRate | null>(null);
+  const [totalMonthsWithPromo, setTotalMonthsWithPromo] = useState<number>(1);
+  const [freeMonths, setFreeMonths] = useState<number>(0);
   
   const memberId = useMemo(() => generateMemberId(), []);
   const LIFETIME_EXPIRY = '2099-12-31';
@@ -86,6 +92,22 @@ const AddMember = () => {
     })();
   }, []);
 
+  // Check and apply promo whenever subscription months change
+  useEffect(() => {
+    (async () => {
+      if (paymentType === 'monthly' && subscriptionMonths > 0) {
+        const promoResult = await checkAndApplyPromo(subscriptionMonths);
+        setAppliedPromo(promoResult.appliedPromo);
+        setTotalMonthsWithPromo(promoResult.totalMonths);
+        setFreeMonths(promoResult.freeMonths);
+      } else {
+        setAppliedPromo(null);
+        setTotalMonthsWithPromo(subscriptionMonths);
+        setFreeMonths(0);
+      }
+    })();
+  }, [subscriptionMonths, paymentType]);
+
   useEffect(() => {
     const lifetime = Number(appPricing.membershipFee) || 200;
     const monthly = Number(appPricing.monthlySubscriptionFee) || 500;
@@ -97,8 +119,9 @@ const AddMember = () => {
     if (e) e.preventDefault();
 
     await initLocalDb();
+    // Use totalMonthsWithPromo for expiry calculation (includes free months from promo)
     const subscriptionExpiryDate = paymentType === 'monthly'
-      ? addMonths(formData.membershipStartDate, subscriptionMonths || 1)
+      ? addMonths(formData.membershipStartDate, totalMonthsWithPromo || 1)
       : '';
 
     // Validate and process referral code
@@ -137,6 +160,10 @@ const AddMember = () => {
       invite_code: memberId, // Auto-generate invite code from member ID
       referred_by: referrer ? formData.referralCode.trim() : null,
       invite_count: 0,
+      // Promo fields
+      appliedPromoId: appliedPromo?.id || null,
+      paidMonths: paymentType === 'monthly' ? subscriptionMonths : undefined,
+      freeMonths: paymentType === 'monthly' ? freeMonths : undefined,
     } as any);
 
     // If referred by someone, increment their invite count
@@ -194,19 +221,25 @@ const AddMember = () => {
       memberId,
     });
     if (paymentType === 'monthly') {
+      const promoNote = appliedPromo && freeMonths > 0 
+        ? ` [Promo: ${appliedPromo.name} - ${freeMonths} free month(s), total ${totalMonthsWithPromo} months]`
+        : '';
       await addPayment({
         date: dateStr,
         amount: (Number(pricing.monthlySubscriptionFee) || 500) * (subscriptionMonths || 1),
         method: paymentMethod,
         category: 'Monthly Subscription',
-        description: `Prepaid ${subscriptionMonths || 1} month(s) subscription for ${formData.fullName} (${memberId})`,
+        description: `Prepaid ${subscriptionMonths || 1} month(s) subscription for ${formData.fullName} (${memberId})${promoNote}`,
         memberId,
       });
     }
 
+    const promoMessage = appliedPromo && freeMonths > 0
+      ? ` 🎉 ${appliedPromo.name} applied: +${freeMonths} free month(s)!`
+      : '';
     toast({
       title: 'Member Added Successfully',
-      description: `Total paid: ₱${totalDue} (${paymentType === 'monthly' ? `lifetime + ${subscriptionMonths || 1} month(s)` : 'lifetime; per session will be paid at attendance'})`,
+      description: `Total paid: ₱${totalDue} (${paymentType === 'monthly' ? `lifetime + ${subscriptionMonths || 1} month(s)` : 'lifetime; per session will be paid at attendance'})${promoMessage}`,
     });
     setShowSuccess(true);
   };
@@ -417,8 +450,9 @@ const AddMember = () => {
     doc.addImage(img, 'PNG', x, y, targetWidth, targetHeight);
     if (isNative()) {
       const pdfArrayBuffer = doc.output('arraybuffer');
-      const base64 = (await import('@/lib/native')).then(m => m.arrayBufferToBase64(pdfArrayBuffer));
-      const dataUrl = `data:application/pdf;base64,${await base64}`;
+      const { arrayBufferToBase64 } = await import('@/lib/native');
+      const base64 = arrayBufferToBase64(pdfArrayBuffer);
+      const dataUrl = `data:application/pdf;base64,${base64}`;
       await downloadDataUrl(dataUrl, `${memberId}-id-card.pdf`);
     } else {
       doc.save(`${memberId}-id-card.pdf`);
@@ -612,80 +646,104 @@ const AddMember = () => {
 
             {/* Summary */}
             <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-              <h3 className="font-semibold text-lg">Registration Summary</h3>
+              <h3 className="font-bold text-xl text-white">Registration Summary</h3>
               
               {/* Membership Information */}
-              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md border border-blue-200 dark:border-blue-800">
-                <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-300 mb-2">🧍 Membership (One-Time Fee)</h4>
-                <div className="text-sm space-y-1">
-                  <p><strong>Member ID:</strong> {memberId}</p>
-                  <p><strong>Membership Duration:</strong> {formData.membershipDuration}</p>
-                  <p><strong>Valid Until:</strong> {formData.membershipDuration === 'Lifetime' ? 'Lifetime' : membershipExpiryDate}</p>
-                  <p><strong>Membership Fee:</strong> ₱{Number(appPricing.membershipFee) || 200}</p>
+              <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-md border-2 border-blue-300 dark:border-blue-700">
+                <h4 className="font-bold text-base text-blue-700 dark:text-blue-300 mb-3">🧍 Membership (One-Time Fee)</h4>
+                <div className="text-sm space-y-2 text-gray-800 dark:text-gray-200">
+                  <p className="flex justify-between"><strong className="text-gray-900 dark:text-gray-100">Member ID:</strong> <span className="font-medium">{memberId}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-900 dark:text-gray-100">Membership Duration:</strong> <span className="font-medium">{formData.membershipDuration}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-900 dark:text-gray-100">Valid Until:</strong> <span className="font-medium">{formData.membershipDuration === 'Lifetime' ? 'Lifetime' : membershipExpiryDate}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-900 dark:text-gray-100">Membership Fee:</strong> <span className="font-bold text-blue-700 dark:text-blue-300">₱{Number(appPricing.membershipFee) || 200}</span></p>
                 </div>
               </div>
 
               {/* Subscription/Payment Type */}
-              <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-md border border-green-200 dark:border-green-800">
-                <h4 className="font-semibold text-sm text-green-700 dark:text-green-300 mb-2">💳 Gym Access Type</h4>
-                <div className="space-y-2">
-                  <div className="flex gap-4 text-sm">
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="paymentType" checked={paymentType === 'monthly'} onChange={() => setPaymentType('monthly')} />
+              <div className="bg-green-50 dark:bg-green-950/40 p-4 rounded-md border-2 border-green-300 dark:border-green-700">
+                <h4 className="font-bold text-base text-green-700 dark:text-green-300 mb-3">💳 Gym Access Type</h4>
+                <div className="space-y-3">
+                  <div className="flex gap-4 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <label className="inline-flex items-center gap-2 cursor-pointer hover:text-green-700 dark:hover:text-green-300 transition-colors">
+                      <input type="radio" name="paymentType" checked={paymentType === 'monthly'} onChange={() => setPaymentType('monthly')} className="w-4 h-4" />
                       📅 Monthly Subscription
                     </label>
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="paymentType" checked={paymentType === 'per_session'} onChange={() => setPaymentType('per_session')} />
+                    <label className="inline-flex items-center gap-2 cursor-pointer hover:text-green-700 dark:hover:text-green-300 transition-colors">
+                      <input type="radio" name="paymentType" checked={paymentType === 'per_session'} onChange={() => setPaymentType('per_session')} className="w-4 h-4" />
                       ⏱️ Per Session
                     </label>
                   </div>
                   {paymentType === 'monthly' && (
                     <div className="pt-2">
-                      <Label htmlFor="months">Prepay Months (Optional)</Label>
+                      <Label htmlFor="months" className="text-gray-900 dark:text-gray-100 font-semibold">Prepay Months (Optional)</Label>
                       <select
                         id="months"
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium mt-1"
                         value={subscriptionMonths}
                         onChange={(e) => setSubscriptionMonths(Number(e.target.value))}
                       >
                         <option value={1}>1 Month</option>
                         <option value={2}>2 Months</option>
                         <option value={3}>3 Months</option>
+                        <option value={4}>4 Months</option>
+                        <option value={5}>5 Months</option>
                         <option value={6}>6 Months</option>
+                        <option value={7}>7 Months</option>
+                        <option value={8}>8 Months</option>
+                        <option value={9}>9 Months</option>
+                        <option value={10}>10 Months</option>
+                        <option value={11}>11 Months</option>
                         <option value={12}>12 Months</option>
                       </select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Subscription expires: {addMonths(formData.membershipStartDate, subscriptionMonths || 1)}
-                      </p>
+                      {appliedPromo && freeMonths > 0 ? (
+                        <div className="mt-2 p-3 bg-green-100 dark:bg-green-950/50 border-2 border-green-400 dark:border-green-600 rounded-md">
+                          <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                            🎉 Promo Applied: {appliedPromo.name}
+                          </p>
+                          <p className="text-sm text-green-700 dark:text-green-300 mt-1 font-medium">
+                            You're paying for {subscriptionMonths} {subscriptionMonths > 1 ? 'months' : 'month'} and getting {freeMonths} {freeMonths > 1 ? 'months' : 'month'} free!
+                          </p>
+                          <p className="text-sm text-green-700 dark:text-green-300 mt-1 font-medium">
+                            Total subscription: <strong className="text-green-900 dark:text-green-100">{totalMonthsWithPromo} months</strong>
+                          </p>
+                          <p className="text-xs text-gray-700 dark:text-gray-300 mt-2 font-medium">
+                            Subscription expires: <strong>{addMonths(formData.membershipStartDate, totalMonthsWithPromo || 1)}</strong>
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium">
+                          Subscription expires: <strong>{addMonths(formData.membershipStartDate, subscriptionMonths || 1)}</strong>
+                        </p>
+                      )}
                     </div>
                   )}
                   {paymentType === 'per_session' && (
-                    <p className="text-xs text-muted-foreground">Member will pay ₱{Number(appPricing.perSessionMemberFee) || 80} per visit</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Member will pay <strong className="text-green-700 dark:text-green-300">₱{Number(appPricing.perSessionMemberFee) || 80}</strong> per visit</p>
                   )}
                 </div>
               </div>
 
               {/* Total Charges */}
-              <div className="bg-orange-50 dark:bg-orange-950/30 p-3 rounded-md border border-orange-200 dark:border-orange-800">
-                <h4 className="font-semibold text-sm text-orange-700 dark:text-orange-300 mb-2">💰 Total Due Today</h4>
-                <div className="text-sm space-y-1">
-                  <div className="flex justify-between">
+              <div className="bg-orange-50 dark:bg-orange-950/40 p-4 rounded-md border-2 border-orange-300 dark:border-orange-700">
+                <h4 className="font-bold text-base text-orange-700 dark:text-orange-300 mb-3">💰 Total Due Today</h4>
+                <div className="text-sm space-y-2 text-gray-800 dark:text-gray-200">
+                  <div className="flex justify-between font-medium">
                     <span>Membership Fee:</span>
-                    <span>₱{Number(appPricing.membershipFee) || 200}</span>
+                    <span className="font-semibold">₱{Number(appPricing.membershipFee) || 200}</span>
                   </div>
                   {paymentType === 'monthly' && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-between font-medium">
                       <span>Subscription ({subscriptionMonths} month{subscriptionMonths > 1 ? 's' : ''}):</span>
-                      <span>₱{(Number(appPricing.monthlySubscriptionFee) || 500) * (subscriptionMonths || 1)}</span>
+                      <span className="font-semibold">₱{(Number(appPricing.monthlySubscriptionFee) || 500) * (subscriptionMonths || 1)}</span>
                     </div>
                   )}
                   {paymentType === 'per_session' && (
-                    <div className="flex justify-between text-muted-foreground">
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400 font-medium">
                       <span>Per-session fees:</span>
                       <span>Charged at check-in</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-bold text-base border-t pt-1 mt-1">
+                  <div className="flex justify-between font-bold text-lg border-t-2 border-orange-300 dark:border-orange-700 pt-2 mt-2 text-orange-700 dark:text-orange-300">
                     <span>Total:</span>
                     <span>₱{totalDue}</span>
                   </div>

@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
-import { type Member } from '@/data/mockData';
+import { type Member, type PromoRate } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { db, initLocalDb } from '@/lib/db';
+import { db, initLocalDb, checkAndApplyPromo, getAppPricing, addPayment } from '@/lib/db';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const EditMember = () => {
   const { id } = useParams();
@@ -21,6 +23,14 @@ const EditMember = () => {
     phone: '',
     membershipExpiryDate: '',
   });
+  
+  // Subscription renewal states
+  const [renewalDialogOpen, setRenewalDialogOpen] = useState(false);
+  const [renewalMonths, setRenewalMonths] = useState<number>(1);
+  const [appliedPromo, setAppliedPromo] = useState<PromoRate | null>(null);
+  const [totalMonthsWithPromo, setTotalMonthsWithPromo] = useState<number>(1);
+  const [freeMonths, setFreeMonths] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash' | 'Card'>('Cash');
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +53,18 @@ const EditMember = () => {
     })();
     return () => { cancelled = true; };
   }, [id]);
+
+  // Check and apply promo whenever renewal months change
+  useEffect(() => {
+    (async () => {
+      if (renewalMonths > 0) {
+        const promoResult = await checkAndApplyPromo(renewalMonths);
+        setAppliedPromo(promoResult.appliedPromo);
+        setTotalMonthsWithPromo(promoResult.totalMonths);
+        setFreeMonths(promoResult.freeMonths);
+      }
+    })();
+  }, [renewalMonths]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +91,81 @@ const EditMember = () => {
       title: "Membership Renewed",
       description: "Membership has been extended by 1 month.",
     });
+  };
+
+  const handleOpenRenewalDialog = () => {
+    setRenewalMonths(1);
+    setRenewalDialogOpen(true);
+  };
+
+  const addMonths = (dateStr: string, months: number): string => {
+    const date = new Date(dateStr);
+    const startDay = date.getDate();
+    date.setMonth(date.getMonth() + months);
+    if (date.getDate() !== startDay) {
+      date.setDate(0);
+    }
+    return date.toISOString().split('T')[0];
+  };
+
+  const handleSubscriptionRenewal = async () => {
+    if (!member || !id) return;
+
+    try {
+      const pricing = await getAppPricing();
+      const dateStr = new Date().toISOString().split('T')[0];
+      
+      // Calculate new expiry date using total months (including promo)
+      const currentExpiry = member.subscriptionExpiryDate || formData.membershipExpiryDate;
+      const newExpiry = addMonths(currentExpiry, totalMonthsWithPromo);
+
+      // Update member with new expiry and promo info
+      await db.members.update(id, {
+        subscriptionExpiryDate: newExpiry,
+        appliedPromoId: appliedPromo?.id || null,
+        paidMonths: (member.paidMonths || 0) + renewalMonths,
+        freeMonths: (member.freeMonths || 0) + freeMonths,
+      } as any);
+
+      // Record payment
+      const promoNote = appliedPromo && freeMonths > 0 
+        ? ` [Promo: ${appliedPromo.name} - ${freeMonths} free month(s), total ${totalMonthsWithPromo} months]`
+        : '';
+      await addPayment({
+        date: dateStr,
+        amount: (Number(pricing.monthlySubscriptionFee) || 500) * renewalMonths,
+        method: paymentMethod,
+        category: 'Monthly Subscription',
+        description: `Subscription renewal: ${renewalMonths} month(s) for ${member.fullName} (${id})${promoNote}`,
+        memberId: id,
+      });
+
+      const promoMessage = appliedPromo && freeMonths > 0
+        ? ` 🎉 ${appliedPromo.name} applied: +${freeMonths} free month(s)!`
+        : '';
+      toast({
+        title: 'Subscription Renewed',
+        description: `Subscription extended to ${newExpiry}${promoMessage}`,
+      });
+
+      // Refresh member data
+      const updated = await db.members.get(id);
+      setMember(updated || null);
+      if (updated) {
+        setFormData(prev => ({
+          ...prev,
+          membershipExpiryDate: updated.membershipExpiryDate,
+        }));
+      }
+
+      setRenewalDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to renew subscription.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (loading) {
@@ -155,6 +252,36 @@ const EditMember = () => {
         </CardContent>
       </Card>
 
+      {/* Subscription Renewal Card (for monthly subscribers) */}
+      {member.paymentType === 'monthly' && member.subscriptionExpiryDate && (
+        <Card className="border-0 shadow-md max-w-2xl">
+          <CardHeader>
+            <CardTitle>Subscription Renewal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Current Subscription</p>
+                <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1">
+                  Expires: {member.subscriptionExpiryDate}
+                </p>
+                {member.appliedPromoId && member.freeMonths && member.freeMonths > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                    Last promo: {member.paidMonths} paid + {member.freeMonths} free months
+                  </p>
+                )}
+              </div>
+              <Button 
+                onClick={handleOpenRenewalDialog} 
+                className="w-full bg-gradient-primary hover:opacity-90"
+              >
+                Renew Subscription
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Referral Information Card */}
       <Card className="border-0 shadow-md max-w-2xl">
         <CardHeader>
@@ -207,6 +334,75 @@ const EditMember = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Renewal Dialog */}
+      <Dialog open={renewalDialogOpen} onOpenChange={setRenewalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renew Subscription</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="renewalMonths">Select Renewal Period</Label>
+              <select
+                id="renewalMonths"
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={renewalMonths}
+                onChange={(e) => setRenewalMonths(Number(e.target.value))}
+              >
+                <option value={1}>1 Month</option>
+                <option value={2}>2 Months</option>
+                <option value={3}>3 Months</option>
+                <option value={6}>6 Months</option>
+                <option value={12}>12 Months</option>
+              </select>
+            </div>
+
+            {appliedPromo && freeMonths > 0 && (
+              <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-700 rounded-md">
+                <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                  🎉 Promo Applied: {appliedPromo.name}
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  You're paying for {renewalMonths} {renewalMonths > 1 ? 'months' : 'month'} and getting {freeMonths} {freeMonths > 1 ? 'months' : 'month'} free!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Total subscription extension: <strong>{totalMonthsWithPromo} months</strong>
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="GCash">GCash</SelectItem>
+                  <SelectItem value="Card">Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-gray-700 dark:text-gray-200">
+                <strong>Current Expiry:</strong> {member.subscriptionExpiryDate}
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
+                <strong>New Expiry:</strong> {addMonths(member.subscriptionExpiryDate || '', totalMonthsWithPromo)}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenewalDialogOpen(false)}>Cancel</Button>
+            <Button className="bg-gradient-primary hover:opacity-90" onClick={handleSubscriptionRenewal}>
+              Confirm Renewal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

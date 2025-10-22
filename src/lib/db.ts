@@ -7,6 +7,7 @@ import {
   type WalkInPricingSettings,
   type AppPricingSettings,
   type PaymentRecord,
+  type PromoRate,
 } from "@/data/mockData";
 
 export class PowerLiftDatabase extends Dexie {
@@ -16,18 +17,21 @@ export class PowerLiftDatabase extends Dexie {
   users!: Table<User, string>;
   settings!: Table<(WalkInPricingSettings & AppPricingSettings & { id: string }), string>;
   payments!: Table<PaymentRecord, string>;
+  promos!: Table<PromoRate, string>;
 
   constructor() {
     super("powerlift-fitness-db");
     // v9: add referral system fields (invite_code, referred_by, invite_count)
     // v10: add membershipDuration, sessionCount, lastSessionDate for refined membership tracking
-    this.version(10).stores({
-      members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDuration, paymentType, subscriptionExpiryDate, invite_code, referred_by",
+    // v11: add promo rate system (promos table, appliedPromoId, paidMonths, freeMonths to members)
+    this.version(11).stores({
+      members: "id, fullName, email, phone, status, isActive, membershipStartDate, membershipExpiryDate, membershipDuration, paymentType, subscriptionExpiryDate, invite_code, referred_by, appliedPromoId",
       attendance: "id, memberId, memberName, date, checkInTime, checkOutTime, is_walk_in, session_type, payment_method, price",
       renewals: "id, memberId, renewalDate",
       users: "id, username, email, role, isActive, createdAt",
       settings: "id",
       payments: "id, date, category, amount, memberId",
+      promos: "id, isActive, createdAt",
     });
   }
 }
@@ -277,5 +281,75 @@ export const createUser = (user: Omit<User, 'id'>) => {
 export const updateUser = (id: string, updates: Partial<User>) => 
   db.users.update(id, updates);
 export const deleteUser = (id: string) => db.users.delete(id);
+
+// Promo Rate management functions
+export const getAllPromos = () => db.promos.toArray();
+export const getActivePromo = async (): Promise<PromoRate | null> => {
+  const allPromos = await db.promos.toArray();
+  const activePromos = allPromos.filter(p => p.isActive === true);
+  // Return the first active promo (should only be one)
+  return activePromos.length > 0 ? activePromos[0] : null;
+};
+export const getPromoById = (id: string) => db.promos.get(id);
+export const createPromo = async (promo: Omit<PromoRate, 'id' | 'createdAt'>): Promise<string> => {
+  const id = `PROMO${Date.now().toString().slice(-6)}`;
+  const now = new Date().toISOString();
+  
+  // If this promo is being set as active, deactivate all other promos
+  if (promo.isActive) {
+    const allPromos = await db.promos.toArray();
+    for (const p of allPromos) {
+      if (p.isActive) {
+        await db.promos.update(p.id, { isActive: false, updatedAt: now });
+      }
+    }
+  }
+  
+  await db.promos.add({ ...promo, id, createdAt: now });
+  return id;
+};
+export const updatePromo = async (id: string, updates: Partial<PromoRate>): Promise<void> => {
+  const now = new Date().toISOString();
+  
+  // If this promo is being set as active, deactivate all other promos
+  if (updates.isActive === true) {
+    const allPromos = await db.promos.toArray();
+    for (const p of allPromos) {
+      if (p.id !== id && p.isActive) {
+        await db.promos.update(p.id, { isActive: false, updatedAt: now });
+      }
+    }
+  }
+  
+  await db.promos.update(id, { ...updates, updatedAt: now });
+};
+export const deletePromo = (id: string) => db.promos.delete(id);
+
+// Helper function to check and apply promo
+export const checkAndApplyPromo = async (paidMonths: number): Promise<{
+  totalMonths: number;
+  appliedPromo: PromoRate | null;
+  freeMonths: number;
+}> => {
+  const activePromo = await getActivePromo();
+  
+  if (!activePromo || paidMonths < activePromo.minMonths) {
+    return {
+      totalMonths: paidMonths,
+      appliedPromo: null,
+      freeMonths: 0,
+    };
+  }
+  
+  // Calculate how many times the promo applies
+  const promoApplications = Math.floor(paidMonths / activePromo.minMonths);
+  const freeMonths = promoApplications * activePromo.freeMonths;
+  
+  return {
+    totalMonths: paidMonths + freeMonths,
+    appliedPromo: activePromo,
+    freeMonths,
+  };
+};
 
 

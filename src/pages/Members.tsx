@@ -354,7 +354,13 @@ const Members = () => {
                                   </div>
                                   <div>
                                     <span className="text-muted-foreground">Subscription:</span>{' '}
-                                    <span className="font-medium">Monthly</span>
+                                    {member.paidMonths && member.freeMonths && member.freeMonths > 0 ? (
+                                      <span className="font-medium text-green-600 dark:text-green-400">
+                                        {member.paidMonths} months (+{member.freeMonths} free) 🎉
+                                      </span>
+                                    ) : (
+                                      <span className="font-medium">Monthly</span>
+                                    )}
                                   </div>
                                   <div>
                                     <span className="text-muted-foreground">Expires:</span>{' '}
@@ -746,6 +752,30 @@ const Members = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Promo Information */}
+                  {selectedMember.paymentType === 'monthly' && selectedMember.subscriptionExpiryDate && selectedMember.paidMonths && selectedMember.freeMonths && selectedMember.freeMonths > 0 && (
+                    <div className="mt-6 p-5 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-lg border-2 border-green-200 dark:border-green-800">
+                      <h4 className="font-bold text-base mb-3 text-green-700 dark:text-green-300">🎉 Active Promo</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Paid Months</p>
+                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{selectedMember.paidMonths}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Free Months</p>
+                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{selectedMember.freeMonths}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Total Months</p>
+                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{selectedMember.paidMonths + selectedMember.freeMonths}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-3 font-medium">
+                        Subscription expires: <strong>{selectedMember.subscriptionExpiryDate}</strong>
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                     <div className="flex flex-col items-center gap-2">

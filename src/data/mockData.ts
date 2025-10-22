@@ -28,6 +28,10 @@ export interface Member {
   invite_code?: string; // Auto-generated from member ID
   referred_by?: string | null; // Invite code of the member who referred this member
   invite_count?: number; // Number of successful referrals (default 0)
+  // Promo system fields
+  appliedPromoId?: string | null; // ID of the promo applied to this member's subscription
+  paidMonths?: number; // Number of months actually paid for
+  freeMonths?: number; // Number of free months received from promo
 }
 
 export interface AttendanceRecord {
@@ -89,6 +93,16 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   lastLoginAt?: string;
+}
+
+export interface PromoRate {
+  id: string;
+  name: string; // e.g., "3 + 1 Promo"
+  minMonths: number; // Minimum months required (e.g., 3)
+  freeMonths: number; // Free months given (e.g., 1)
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 // Generate member ID helper

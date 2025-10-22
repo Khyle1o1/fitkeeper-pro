@@ -202,6 +202,18 @@ export async function exportTableToPdfWithLogo(options: PdfExportWithLogoOptions
         headStyles: { fillColor: [30, 41, 59] },
         alternateRowStyles: { fillColor: [250, 250, 250] },
         margin: { left: marginLeft, right: marginLeft },
+        didParseCell: function (data) {
+          // Highlight rows that contain "Total" in the first column
+          if (data.section === 'body') {
+            const firstCell = pBody[data.row.index]?.[0];
+            if (typeof firstCell === 'string' && firstCell.toLowerCase().includes('total')) {
+              data.cell.styles.fillColor = [225, 29, 46]; // Primary red color
+              data.cell.styles.textColor = [255, 255, 255]; // White text
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fontSize = 11;
+            }
+          }
+        },
       });
       cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 12;
     }
