@@ -165,6 +165,7 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     id: 'app_pricing',
     membershipFee: 200,
     monthlySubscriptionFee: 500,
+    studentMonthlySubscriptionFee: 350,
     perSessionMemberFee: 80,
     perSessionWalkInFee: 100,
   } as any);
@@ -243,11 +244,13 @@ export const getAppPricing = async (): Promise<AppPricingSettings> => {
   return rec ? {
     membershipFee: Number(rec.membershipFee) || 200,
     monthlySubscriptionFee: Number(rec.monthlySubscriptionFee) || 500,
+    studentMonthlySubscriptionFee: Number(rec.studentMonthlySubscriptionFee) || 350,
     perSessionMemberFee: Number(rec.perSessionMemberFee) || 80,
     perSessionWalkInFee: Number(rec.perSessionWalkInFee) || 100,
   } : {
     membershipFee: 200,
     monthlySubscriptionFee: 500,
+    studentMonthlySubscriptionFee: 350,
     perSessionMemberFee: 80,
     perSessionWalkInFee: 100,
   };

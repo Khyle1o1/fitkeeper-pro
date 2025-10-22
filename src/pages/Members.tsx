@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Helper to determine member category and badge
 const getMemberCategory = (member: Member): { 
-  type: 'monthly_subscriber' | 'per_session' | 'member_only' | 'archived',
+  type: 'monthly_subscriber' | 'per_session' | 'archived',
   badge: { text: string; className: string; emoji: string }
 } => {
   // Archived members
@@ -48,17 +48,17 @@ const getMemberCategory = (member: Member): {
     };
   }
 
-  // Member with fee paid but no subscription yet
+  // Members with fee paid but no subscription yet - treat as per_session for display
   if (member.membershipFeePaid) {
     return {
-      type: 'member_only',
+      type: 'per_session',
       badge: { text: 'Member Only', className: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900 dark:text-orange-300', emoji: '🟧' }
     };
   }
 
-  // Default to member only if they're active
+  // Default to per_session if they're active
   return {
-    type: 'member_only',
+    type: 'per_session',
     badge: { text: 'Member', className: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900 dark:text-orange-300', emoji: '🟧' }
   };
 };
@@ -71,7 +71,7 @@ const Members = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
   const [barcodePreview, setBarcodePreview] = useState<string | null>(null);
-  const [tabsValue, setTabsValue] = useState<'monthly' | 'per_session' | 'member_only' | 'archived'>('monthly');
+  const [tabsValue, setTabsValue] = useState<'monthly' | 'per_session' | 'archived'>('monthly');
   const [isRenewDialogOpen, setIsRenewDialogOpen] = useState(false);
   const [renewMember, setRenewMember] = useState<Member | null>(null);
   const [renewMonths, setRenewMonths] = useState<number>(1);
@@ -306,10 +306,9 @@ const Members = () => {
 
       {/* Members List with Category Tabs */}
       <Tabs value={tabsValue} onValueChange={(v) => setTabsValue(v as any)}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="monthly">🟩 Monthly Subscribers</TabsTrigger>
           <TabsTrigger value="per_session">🟦 Per Session</TabsTrigger>
-          <TabsTrigger value="member_only">🟧 Member Only</TabsTrigger>
           <TabsTrigger value="archived">🟥 Archived</TabsTrigger>
         </TabsList>
 
@@ -498,103 +497,6 @@ const Members = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="member_only">
-          <Card className="border-0 shadow-md">
-            <CardHeader>
-              <CardTitle>🟧 Member Only</CardTitle>
-              <p className="text-sm text-muted-foreground">Members who haven't chosen a subscription option yet</p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {(() => {
-                  const memberOnlyMembers = filteredMembers.filter(m => {
-                    const category = getMemberCategory(m);
-                    return category.type === 'member_only';
-                  });
-                  const displayMembers = getFilteredMembersByType(memberOnlyMembers);
-                  return displayMembers.length > 0 ? (
-                    displayMembers.map((member) => {
-                      const category = getMemberCategory(member);
-                      return (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
-                          onClick={() => openMemberDialog(member)}
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3">
-                              {member.photoDataUrl && (
-                                <img src={member.photoDataUrl} alt="" className="h-12 w-12 rounded-full object-cover border-2" />
-                              )}
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-semibold">{member.fullName}</h3>
-                                  <Badge className={category.badge.className}>{category.badge.emoji} {category.badge.text}</Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground">ID: {member.id}</p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 mt-1 text-xs">
-                                  <div>
-                                    <span className="text-muted-foreground">Membership Fee:</span>{' '}
-                                    <span className="font-medium">₱200 (Paid)</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Subscription:</span>{' '}
-                                    <span className="font-medium text-orange-600">Not Subscribed Yet</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Access Type:</span>{' '}
-                                    <span className="font-medium">Inactive</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setRenewMember(member); 
-                                setRenewMonths(1); 
-                                setRenewStep('confirm'); 
-                                setIsRenewDialogOpen(true); 
-                              }}
-                              className="text-green-700 border-green-200 hover:bg-green-50"
-                            >
-                              Start Monthly Subscription
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                db.members.update(member.id, { paymentType: 'per_session' } as any)
-                                  .then(() => {
-                                    setMembers(prev => prev.map(x => x.id === member.id ? { ...x, paymentType: 'per_session' } : x));
-                                    toast({ title: 'Set to Per Session', description: `${member.fullName} will now pay per visit.` });
-                                  });
-                              }}
-                              className="text-blue-700 border-blue-200 hover:bg-blue-50"
-                            >
-                              Set to Per Session
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        {activeFilter ? 'No members match the current filter.' : 'All members have chosen a subscription option.'}
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="archived">
           <Card className="border-0 shadow-md">

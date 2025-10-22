@@ -28,6 +28,8 @@ export interface Member {
   invite_code?: string; // Auto-generated from member ID
   referred_by?: string | null; // Invite code of the member who referred this member
   invite_count?: number; // Number of successful referrals (default 0)
+  // Student status for discounted pricing
+  isStudent?: boolean; // Student status for discounted pricing
   // Promo system fields
   appliedPromoId?: string | null; // ID of the promo applied to this member's subscription
   paidMonths?: number; // Number of months actually paid for
@@ -59,6 +61,7 @@ export interface WalkInPricingSettings {
 export interface AppPricingSettings {
   membershipFee: number; // default ₱200 (one-time lifetime)
   monthlySubscriptionFee?: number; // default ₱500
+  studentMonthlySubscriptionFee?: number; // default ₱350
   perSessionMemberFee?: number; // default ₱80
   perSessionWalkInFee?: number; // default ₱100
 }

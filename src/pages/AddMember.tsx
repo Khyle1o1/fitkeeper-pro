@@ -27,10 +27,11 @@ const AddMember = () => {
     membershipDuration: 'Lifetime' as 'Lifetime' | '1 Year' | '2 Years' | '3 Years' | '4 Years' | '5 Years',
     photoDataUrl: null as string | null,
     referralCode: '', // Optional referral code
+    isStudent: false, // Student status for discounted pricing
   });
   const [paymentType, setPaymentType] = useState<'monthly' | 'per_session'>('monthly');
   const [subscriptionMonths, setSubscriptionMonths] = useState<number>(1);
-  const [appPricing, setAppPricingState] = useState<{ membershipFee: number; monthlySubscriptionFee?: number; perSessionMemberFee?: number }>({ membershipFee: 200, monthlySubscriptionFee: 500, perSessionMemberFee: 80 });
+  const [appPricing, setAppPricingState] = useState<{ membershipFee: number; monthlySubscriptionFee?: number; studentMonthlySubscriptionFee?: number; perSessionMemberFee?: number }>({ membershipFee: 200, monthlySubscriptionFee: 500, studentMonthlySubscriptionFee: 350, perSessionMemberFee: 80 });
   
   // Promo state
   const [appliedPromo, setAppliedPromo] = useState<PromoRate | null>(null);
@@ -59,6 +60,8 @@ const AddMember = () => {
   const [totalDue, setTotalDue] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash' | 'Card'>('Cash');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(5);
+  const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Local helper: add months to a YYYY-MM-DD start date (handles end-of-month)
   const addMonths = (startIso: string, months: number): string => {
@@ -110,10 +113,10 @@ const AddMember = () => {
 
   useEffect(() => {
     const lifetime = Number(appPricing.membershipFee) || 200;
-    const monthly = Number(appPricing.monthlySubscriptionFee) || 500;
+    const monthly = formData.isStudent ? (Number(appPricing.studentMonthlySubscriptionFee) || 350) : (Number(appPricing.monthlySubscriptionFee) || 500);
     const firstCharge = paymentType === 'monthly' ? (monthly * (subscriptionMonths || 1)) : 0;
     setTotalDue(lifetime + firstCharge);
-  }, [appPricing, paymentType, subscriptionMonths]);
+  }, [appPricing, paymentType, subscriptionMonths, formData.isStudent]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -160,6 +163,7 @@ const AddMember = () => {
       invite_code: memberId, // Auto-generate invite code from member ID
       referred_by: referrer ? formData.referralCode.trim() : null,
       invite_count: 0,
+      isStudent: formData.isStudent,
       // Promo fields
       appliedPromoId: appliedPromo?.id || null,
       paidMonths: paymentType === 'monthly' ? subscriptionMonths : undefined,
@@ -224,12 +228,13 @@ const AddMember = () => {
       const promoNote = appliedPromo && freeMonths > 0 
         ? ` [Promo: ${appliedPromo.name} - ${freeMonths} free month(s), total ${totalMonthsWithPromo} months]`
         : '';
+      const monthlyFee = formData.isStudent ? (Number(pricing.studentMonthlySubscriptionFee) || 350) : (Number(pricing.monthlySubscriptionFee) || 500);
       await addPayment({
         date: dateStr,
-        amount: (Number(pricing.monthlySubscriptionFee) || 500) * (subscriptionMonths || 1),
+        amount: monthlyFee * (subscriptionMonths || 1),
         method: paymentMethod,
         category: 'Monthly Subscription',
-        description: `Prepaid ${subscriptionMonths || 1} month(s) subscription for ${formData.fullName} (${memberId})${promoNote}`,
+        description: `Prepaid ${subscriptionMonths || 1} month(s) ${formData.isStudent ? 'student ' : ''}subscription for ${formData.fullName} (${memberId})${promoNote}`,
         memberId,
       });
     }
@@ -242,6 +247,22 @@ const AddMember = () => {
       description: `Total paid: ₱${totalDue} (${paymentType === 'monthly' ? `lifetime + ${subscriptionMonths || 1} month(s)` : 'lifetime; per session will be paid at attendance'})${promoMessage}`,
     });
     setShowSuccess(true);
+    setRedirectCountdown(5);
+    
+    // Auto-close success modal after 5 seconds and redirect to members page
+    const interval = setInterval(() => {
+      setRedirectCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setCountdownInterval(null);
+          setShowSuccess(false);
+          navigate('/members');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setCountdownInterval(interval);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -552,6 +573,25 @@ const AddMember = () => {
               </p>
             </div>
 
+            {/* Student Status */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isStudent"
+                  checked={formData.isStudent}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isStudent: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="isStudent" className="text-sm font-medium">
+                  Student (Discounted Monthly Subscription)
+                </Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Check this if the member is a student to apply discounted monthly subscription pricing.
+              </p>
+            </div>
+
             {/* Start Date and Membership Duration */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
@@ -733,8 +773,8 @@ const AddMember = () => {
                   </div>
                   {paymentType === 'monthly' && (
                     <div className="flex justify-between font-medium">
-                      <span>Subscription ({subscriptionMonths} month{subscriptionMonths > 1 ? 's' : ''}):</span>
-                      <span className="font-semibold">₱{(Number(appPricing.monthlySubscriptionFee) || 500) * (subscriptionMonths || 1)}</span>
+                      <span>{formData.isStudent ? 'Student ' : ''}Subscription ({subscriptionMonths} month{subscriptionMonths > 1 ? 's' : ''}):</span>
+                      <span className="font-semibold">₱{(formData.isStudent ? (Number(appPricing.studentMonthlySubscriptionFee) || 350) : (Number(appPricing.monthlySubscriptionFee) || 500)) * (subscriptionMonths || 1)}</span>
                     </div>
                   )}
                   {paymentType === 'per_session' && (
@@ -792,7 +832,7 @@ const AddMember = () => {
             <div className="flex justify-between"><span className="text-muted-foreground">Membership Duration</span><span className="font-medium">{formData.membershipDuration}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Membership Fee</span><span className="font-medium">₱{Number(appPricing.membershipFee) || 200}</span></div>
             {paymentType === 'monthly' && (
-              <div className="flex justify-between"><span className="text-muted-foreground">Monthly Subscription</span><span className="font-medium">₱{(Number(appPricing.monthlySubscriptionFee) || 500) * (subscriptionMonths || 1)} ({subscriptionMonths} month{subscriptionMonths > 1 ? 's' : ''})</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{formData.isStudent ? 'Student ' : ''}Monthly Subscription</span><span className="font-medium">₱{(formData.isStudent ? (Number(appPricing.studentMonthlySubscriptionFee) || 350) : (Number(appPricing.monthlySubscriptionFee) || 500)) * (subscriptionMonths || 1)} ({subscriptionMonths} month{subscriptionMonths > 1 ? 's' : ''})</span></div>
             )}
             {paymentType === 'per_session' && (
               <div className="flex justify-between"><span className="text-muted-foreground">Access Type</span><span className="font-medium">Per Session (₱{Number(appPricing.perSessionMemberFee) || 80}/visit)</span></div>
@@ -824,6 +864,10 @@ const AddMember = () => {
       {/* Success Modal */}
       <Dialog open={showSuccess} onOpenChange={(open) => {
         if (!open) {
+          if (countdownInterval) {
+            clearInterval(countdownInterval);
+            setCountdownInterval(null);
+          }
           setShowSuccess(false);
           navigate('/members');
         }
@@ -840,17 +884,30 @@ const AddMember = () => {
                 <p><strong>Start:</strong> {formData.membershipStartDate}</p>
                 <p><strong>Membership:</strong> {formData.membershipDuration}</p>
                 <p><strong>Expiry:</strong> {formData.membershipDuration === 'Lifetime' ? 'Lifetime' : membershipExpiryDate}</p>
-                <p><strong>Access Type:</strong> {paymentType === 'monthly' ? 'Monthly Subscription' : 'Per Session'}</p>
+                <p><strong>Access Type:</strong> {paymentType === 'monthly' ? (formData.isStudent ? 'Student Monthly Subscription' : 'Monthly Subscription') : 'Per Session'}</p>
+                {formData.isStudent && <p><strong>Student Status:</strong> Yes (Discounted Pricing)</p>}
               </div>
               <div className="flex items-center gap-6">
                 {qrCode && <img src={qrCode} className="h-28 w-28" alt="QR" />}
               </div>
             </div>
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                ⏰ Redirecting to members page in {redirectCountdown} second{redirectCountdown !== 1 ? 's' : ''}...
+              </p>
+            </div>
           </div>
           <DialogFooter className="flex gap-2">
             <Button type="button" variant="outline" onClick={downloadIdCardPng}>Download ID Card (PNG)</Button>
             <Button type="button" onClick={downloadIdCardPdf}>Download ID Card (PDF)</Button>
-            <Button type="button" variant="secondary" onClick={() => { setShowSuccess(false); navigate('/members'); }}>Close</Button>
+            <Button type="button" variant="secondary" onClick={() => { 
+              if (countdownInterval) {
+                clearInterval(countdownInterval);
+                setCountdownInterval(null);
+              }
+              setShowSuccess(false); 
+              navigate('/members'); 
+            }}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, UserCheck, AlertTriangle, Clock, Trash2, ExternalLink } from 'lucide-react';
-import { db, initLocalDb, clearAllData, resetDatabase } from '@/lib/db';
+import { Users, UserCheck, AlertTriangle, Clock, ExternalLink } from 'lucide-react';
+import { db, initLocalDb } from '@/lib/db';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -65,29 +65,6 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleClearAllData = async () => {
-    if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
-      await clearAllData();
-      toast({
-        title: 'Data Cleared',
-        description: 'All members, attendance, and renewal data has been cleared.',
-      });
-      // Reload stats
-      window.location.reload();
-    }
-  };
-
-  const handleResetDatabase = async () => {
-    if (confirm('Are you sure you want to reset the database? This will fix schema issues but clear all data.')) {
-      await resetDatabase();
-      toast({
-        title: 'Database Reset',
-        description: 'Database has been reset with new schema.',
-      });
-      // Reload stats
-      window.location.reload();
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -95,34 +72,12 @@ const Dashboard = () => {
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Welcome back! Here's what's happening at your gym today.</p>
-        <div className="flex items-center justify-between mt-2">
-          {currentTime && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>Manila Time: {currentTime}</span>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetDatabase}
-              className="text-orange-600 hover:text-orange-700"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Reset DB
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClearAllData}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear Data
-            </Button>
+        {currentTime && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+            <Clock className="h-4 w-4" />
+            <span>Manila Time: {currentTime}</span>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Stats Grid */}

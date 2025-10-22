@@ -25,6 +25,7 @@ const Settings = () => {
   const { toast } = useToast();
   const [membershipFee, setMembershipFee] = useState<string>('200');
   const [monthlySubscriptionFee, setMonthlySubscriptionFee] = useState<string>('500');
+  const [studentMonthlySubscriptionFee, setStudentMonthlySubscriptionFee] = useState<string>('350');
   const [perSessionMemberFee, setPerSessionMemberFee] = useState<string>('80');
   const [perSessionWalkInFee, setPerSessionWalkInFee] = useState<string>('100');
   
@@ -55,6 +56,7 @@ const Settings = () => {
       const appPricing = await getAppPricing();
       setMembershipFee(String(appPricing.membershipFee ?? 200));
       setMonthlySubscriptionFee(String(appPricing.monthlySubscriptionFee ?? 500));
+      setStudentMonthlySubscriptionFee(String(appPricing.studentMonthlySubscriptionFee ?? 350));
       setPerSessionMemberFee(String(appPricing.perSessionMemberFee ?? 80));
       setPerSessionWalkInFee(String(appPricing.perSessionWalkInFee ?? 100));
       await loadPromos();
@@ -69,6 +71,7 @@ const Settings = () => {
     await setAppPricing({ 
       membershipFee: Number(membershipFee) || 200,
       monthlySubscriptionFee: Number(monthlySubscriptionFee) || 500,
+      studentMonthlySubscriptionFee: Number(studentMonthlySubscriptionFee) || 350,
       perSessionMemberFee: Number(perSessionMemberFee) || 80,
       perSessionWalkInFee: Number(perSessionWalkInFee) || 100,
     });
@@ -198,6 +201,10 @@ const Settings = () => {
             <div className="space-y-2">
               <Label htmlFor="monthlySubscriptionFee">Monthly Subscription Fee (₱)</Label>
               <Input id="monthlySubscriptionFee" type="number" min="0" value={monthlySubscriptionFee} onChange={(e) => setMonthlySubscriptionFee(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="studentMonthlySubscriptionFee">Student Monthly Subscription Fee (₱)</Label>
+              <Input id="studentMonthlySubscriptionFee" type="number" min="0" value={studentMonthlySubscriptionFee} onChange={(e) => setStudentMonthlySubscriptionFee(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="perSessionMemberFee">Per Session Fee (Member) (₱)</Label>
