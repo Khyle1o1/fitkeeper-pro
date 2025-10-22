@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PromoRate } from '@/data/mockData';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, Shield, RotateCcw } from 'lucide-react';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
+import { resetActivation, isAppActivated } from '@/lib/activation';
 
 const Settings = () => {
   const { toast } = useToast();
@@ -38,6 +39,10 @@ const Settings = () => {
     isActive: false,
   });
   const [deletePromoId, setDeletePromoId] = useState<string | null>(null);
+  
+  // Activation reset states
+  const [showResetActivation, setShowResetActivation] = useState(false);
+  const [activationStatus, setActivationStatus] = useState<boolean>(false);
 
   const loadPromos = async () => {
     const allPromos = await getAllPromos();
@@ -53,6 +58,10 @@ const Settings = () => {
       setPerSessionMemberFee(String(appPricing.perSessionMemberFee ?? 80));
       setPerSessionWalkInFee(String(appPricing.perSessionWalkInFee ?? 100));
       await loadPromos();
+      
+      // Check activation status
+      const isActivated = await isAppActivated();
+      setActivationStatus(isActivated);
     })();
   }, []);
 
@@ -150,6 +159,25 @@ const Settings = () => {
     }
   };
 
+  const handleResetActivation = async () => {
+    try {
+      await resetActivation();
+      setActivationStatus(false);
+      setShowResetActivation(false);
+      toast({ 
+        title: 'Activation Reset', 
+        description: 'App activation has been reset. The app will require activation on next launch.',
+        variant: 'destructive'
+      });
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to reset activation.', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -182,6 +210,48 @@ const Settings = () => {
           </div>
           <div className="flex justify-end">
             <Button className="bg-gradient-primary hover:opacity-90" onClick={handleSave}>Save</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* App Activation Section */}
+      <Card className="border-0 shadow-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            App Activation
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-lg border-2 bg-gray-50 dark:bg-gray-900">
+            <div className="flex items-center gap-3">
+              <div className={`h-3 w-3 rounded-full ${activationStatus ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div>
+                <p className="font-medium">
+                  {activationStatus ? 'App is Activated' : 'App is Not Activated'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {activationStatus 
+                    ? 'This device has been activated and can use the app offline.' 
+                    : 'This device requires activation to use the app.'
+                  }
+                </p>
+              </div>
+            </div>
+            {activationStatus && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowResetActivation(true)}
+                className="flex items-center gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset Activation
+              </Button>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            <p><strong>Note:</strong> Resetting activation will require entering the activation code again on next app launch.</p>
           </div>
         </CardContent>
       </Card>
@@ -330,6 +400,30 @@ const Settings = () => {
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Activation Confirmation Dialog */}
+      <AlertDialog open={showResetActivation} onOpenChange={setShowResetActivation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Reset App Activation
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reset the app activation? This will require entering the activation code again on the next app launch. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleResetActivation}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Reset Activation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
